@@ -107,6 +107,18 @@ async def init_db():
         except Exception:
             pass
 
+        # Migration: solution (Musterlösung) field for tasks
+        try:
+            await db.execute("ALTER TABLE tasks ADD COLUMN solution TEXT DEFAULT ''")
+        except Exception:
+            pass
+
+        # Migration: grading_status for async AI grading
+        try:
+            await db.execute("ALTER TABLE answers ADD COLUMN grading_status TEXT")
+        except Exception:
+            pass
+
         # Migration: add question_data column and remap old task_type values
         try:
             await db.execute("ALTER TABLE tasks ADD COLUMN question_data TEXT DEFAULT '{}'")

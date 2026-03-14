@@ -117,6 +117,11 @@ export default function ResultView() {
                 <strong>Feedback:</strong> {answer.feedback}
               </div>
             )}
+            {answer.solution && (
+              <div className="result-feedback" style={{ borderLeftColor: "var(--accent)" }}>
+                <strong>Musterlösung:</strong> {answer.solution}
+              </div>
+            )}
 
             {/* Dispute / Flag button */}
             {!answer.manually_adjusted && !answer.disputed && (

@@ -60,9 +60,9 @@ async def create_task(
 ):
     qdata_json = json.dumps(task.question_data or {}, ensure_ascii=False)
     cursor = await db.execute(
-        """INSERT INTO tasks (title, text, hint, topic, task_type, points, parent_task_id, source, question_data, pool_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (task.title, task.text, task.hint, task.topic, task.task_type,
+        """INSERT INTO tasks (title, text, hint, solution, topic, task_type, points, parent_task_id, source, question_data, pool_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (task.title, task.text, task.hint, task.solution, task.topic, task.task_type,
          task.points, task.parent_task_id, task.source, qdata_json, task.pool_id),
     )
     await db.commit()
@@ -172,6 +172,7 @@ async def ai_edit_task_endpoint(
             task["title"], task["text"], task["hint"], task["points"], req.prompt,
             task_type=task.get("task_type", "essay"),
             question_data=task.get("question_data"),
+            solution=task.get("solution", ""),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"KI-Bearbeitung fehlgeschlagen: {str(e)}")
@@ -179,11 +180,12 @@ async def ai_edit_task_endpoint(
     # Apply changes
     qdata_json = json.dumps(updated.get("question_data", task.get("question_data", {})), ensure_ascii=False)
     await db.execute(
-        "UPDATE tasks SET title = ?, text = ?, hint = ?, points = ?, task_type = ?, question_data = ? WHERE id = ?",
+        "UPDATE tasks SET title = ?, text = ?, hint = ?, solution = ?, points = ?, task_type = ?, question_data = ? WHERE id = ?",
         (
             updated.get("title", task["title"]),
             updated.get("text", task["text"]),
             updated.get("hint", task["hint"]),
+            updated.get("solution", task.get("solution", "")),
             updated.get("points", task["points"]),
             updated.get("task_type", task["task_type"]),
             qdata_json,

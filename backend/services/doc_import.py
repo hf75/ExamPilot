@@ -55,18 +55,31 @@ Wähle den Aufgabentyp basierend auf dem Inhalt:
 - Wenn das Dokument bereits Aufgaben enthält, übernimm den passenden Typ
 - Wenn es Lernstoff/Text ist, erstelle verschiedene Aufgabentypen dazu
 
+WICHTIG für den Aufgabentext:
+- Formuliere die Aufgaben in klarem, eigenständigem Deutsch
+- Übernimm KEINE Formatierungsartefakte aus dem Quelldokument (z.B. Dateinamen wie "verzeichnisliste.txt", HTML/Markdown-Tags, Code-Blöcke die nur Formatierung sind)
+- Wenn das Dokument auf Dateien, Bilder oder externe Ressourcen verweist, beschreibe den relevanten Inhalt direkt im Aufgabentext statt auf die Datei zu verweisen
+- Der Aufgabentext muss für sich allein verständlich sein, ohne das Quelldokument
+
 Antworte als JSON-Array:
 [
   {
     "title": "Aufgabentitel",
     "text": "Aufgabentext",
-    "hint": "Lösung/Lösungshinweis",
+    "hint": "Optionaler Hinweis für den Schüler während der Prüfung",
+    "solution": "Ausführliche Musterlösung — diese wird nach der Prüfung angezeigt und zur Bewertung genutzt",
     "topic": "Themengebiet",
     "task_type": "multichoice|truefalse|shortanswer|...",
     "points": 1-5,
     "question_data": { ... }
   }
-]"""
+]
+
+WICHTIG: Jede Aufgabe MUSS eine ausführliche "solution" (Musterlösung) enthalten.
+- Bei Multiple Choice: Erkläre warum die richtige Antwort korrekt ist
+- Bei Kurzantwort/Numerisch: Gib die korrekte Antwort mit Erklärung
+- Bei Essay/Freitext: Beschreibe was eine vollständige Antwort enthalten sollte
+- Bei Zuordnung/Reihenfolge: Erkläre die korrekte Zuordnung/Reihenfolge"""
 
 SYSTEM_PROMPT = """Du bist ein erfahrener Lehrer. Analysiere das hochgeladene Dokument und erstelle daraus strukturierte Prüfungsaufgaben in verschiedenen Formaten.
 Antworte IMMER als valides JSON-Array. Keine zusätzliche Erklärung."""
@@ -206,6 +219,57 @@ async def import_document(file_path: str, original_filename: str) -> list[dict]:
         task.setdefault("title", "Unbenannte Aufgabe")
         task.setdefault("text", "")
         task.setdefault("hint", "")
+        task.setdefault("solution", "")
+        task.setdefault("topic", "")
+        task.setdefault("task_type", "essay")
+        task.setdefault("points", 1)
+        task.setdefault("question_data", {})
+
+    return tasks
+
+
+async def import_document_with_instructions(
+    file_path: str, original_filename: str, instructions: str
+) -> list[dict]:
+    """
+    Like import_document, but with custom teacher instructions for task generation.
+    The instructions guide what kind of tasks to create.
+    """
+    ext = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else ""
+
+    if ext == "docx":
+        content = _extract_docx(file_path)
+    else:
+        content = _extract_pdf(file_path)
+
+    if not content:
+        raise ValueError("Keine Inhalte im Dokument gefunden.")
+
+    # Build a customized prompt with teacher instructions
+    custom_prompt = TASK_PROMPT
+    if instructions.strip():
+        custom_prompt += f"\n\nWICHTIG — Anweisungen des Lehrers:\n{instructions.strip()}\n\nHalte dich unbedingt an diese Anweisungen bei der Erstellung der Aufgaben."
+
+    content.append({"type": "text", "text": custom_prompt})
+
+    async with _semaphore:
+        response = await asyncio.to_thread(
+            _get_client().messages.create,
+            model=CLAUDE_MODEL,
+            max_tokens=64000,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": content}],
+        )
+
+    tasks = _parse_json_response(response.content[0].text)
+
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        task.setdefault("title", "Unbenannte Aufgabe")
+        task.setdefault("text", "")
+        task.setdefault("hint", "")
+        task.setdefault("solution", "")
         task.setdefault("topic", "")
         task.setdefault("task_type", "essay")
         task.setdefault("points", 1)

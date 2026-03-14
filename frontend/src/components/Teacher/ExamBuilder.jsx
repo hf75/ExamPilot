@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import QuestionRenderer from "../Questions/QuestionRenderer";
 
 export default function ExamBuilder() {
   const navigate = useNavigate();
   const [exams, setExams] = useState([]);
   const [editing, setEditing] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showAdhoc, setShowAdhoc] = useState(false);
 
   useEffect(() => {
     loadExams();
@@ -40,6 +42,19 @@ export default function ExamBuilder() {
     );
   }
 
+  if (showAdhoc) {
+    return (
+      <AdhocExamForm
+        onDone={(exam) => {
+          setShowAdhoc(false);
+          if (exam) setEditing(exam);
+          loadExams();
+        }}
+        onCancel={() => setShowAdhoc(false)}
+      />
+    );
+  }
+
   if (showCreate) {
     return (
       <ExamForm
@@ -62,9 +77,14 @@ export default function ExamBuilder() {
     <div className="exam-builder">
       <div className="page-header">
         <h2>Klassenarbeiten</h2>
-        <button className="btn-primary-sm" onClick={() => setShowCreate(true)}>
-          + Neue Klassenarbeit
-        </button>
+        <div className="page-header-actions">
+          <button className="btn-primary-sm" onClick={() => setShowCreate(true)}>
+            + Neue Klassenarbeit
+          </button>
+          <button className="btn-primary-sm btn-adhoc" onClick={() => setShowAdhoc(true)}>
+            + Ad-Hoc aus Dokumenten
+          </button>
+        </div>
       </div>
 
       <div className="exam-list">
@@ -265,6 +285,233 @@ function ExamForm({ exam, onSave, onCancel }) {
   );
 }
 
+function AdhocExamForm({ onDone, onCancel }) {
+  const [form, setForm] = useState({
+    title: "",
+    class_name: "",
+    date: "",
+    duration_minutes: "",
+    description: "",
+    instructions: "",
+  });
+  const [files, setFiles] = useState([]);
+  const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState("");
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleFileChange(e) {
+    const selected = Array.from(e.target.files || []);
+    setFiles(selected);
+  }
+
+  async function handleGenerate(e) {
+    e.preventDefault();
+    if (files.length === 0) {
+      alert("Bitte mindestens ein Dokument hochladen.");
+      return;
+    }
+    if (!form.title.trim()) {
+      alert("Bitte einen Titel eingeben.");
+      return;
+    }
+
+    setGenerating(true);
+    setProgress("Dokumente werden analysiert und Aufgaben generiert...");
+
+    try {
+      const formData = new FormData();
+      for (const f of files) {
+        formData.append("files", f);
+      }
+      formData.append("title", form.title);
+      formData.append("description", form.description);
+      formData.append("class_name", form.class_name);
+      formData.append("date", form.date);
+      formData.append("duration_minutes", form.duration_minutes || "");
+      formData.append("instructions", form.instructions);
+
+      const result = await api.postForm("/api/exams/generate-adhoc", formData);
+      setProgress(
+        `Fertig! ${result.task_count} Aufgaben erstellt.` +
+          (result.errors?.length
+            ? ` (${result.errors.length} Fehler)`
+            : "")
+      );
+      setTimeout(() => onDone(result.exam), 1500);
+    } catch (err) {
+      setProgress("");
+      alert("Fehler: " + (err.message || "Unbekannter Fehler"));
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="task-editor">
+      <h2>Ad-Hoc Klassenarbeit erstellen</h2>
+      <p className="adhoc-description">
+        Lade Dokumente hoch und beschreibe, wie die Klassenarbeit aussehen soll.
+        Die KI erstellt automatisch passende Aufgaben.
+      </p>
+      <form onSubmit={handleGenerate}>
+        <div className="form-group">
+          <label>Titel</label>
+          <input
+            type="text"
+            value={form.title}
+            onChange={(e) => update("title", e.target.value)}
+            placeholder="z.B. Klassenarbeit 2 - Linux Administration"
+            required
+          />
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Klasse</label>
+            <input
+              type="text"
+              value={form.class_name}
+              onChange={(e) => update("class_name", e.target.value)}
+              placeholder="z.B. WI25Z1"
+            />
+          </div>
+          <div className="form-group">
+            <label>Datum</label>
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => update("date", e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>Zeitlimit (Min.)</label>
+            <input
+              type="number"
+              value={form.duration_minutes}
+              onChange={(e) => update("duration_minutes", e.target.value)}
+              placeholder="optional"
+              min="1"
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Dokumente (PDF / DOCX)</label>
+          <input
+            type="file"
+            accept=".pdf,.docx"
+            multiple
+            onChange={handleFileChange}
+            className="file-input"
+          />
+          {files.length > 0 && (
+            <div className="adhoc-file-list">
+              {files.map((f, i) => (
+                <span key={i} className="adhoc-file-tag">{f.name}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="form-group">
+          <label>Anweisungen zur Aufgabenerstellung</label>
+          <textarea
+            value={form.instructions}
+            onChange={(e) => update("instructions", e.target.value)}
+            placeholder="Beschreibe, wie die Aufgaben aussehen sollen. Z.B.: 'Erstelle nur Freitextaufgaben bei denen Schüler Linux-Kommandos eingeben müssen' oder 'Erstelle 10 Multiple-Choice-Fragen zum Thema Netzwerke'"
+            rows={4}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Beschreibung (optional)</label>
+          <textarea
+            value={form.description}
+            onChange={(e) => update("description", e.target.value)}
+            placeholder="Optionale Beschreibung der Klassenarbeit"
+            rows={2}
+          />
+        </div>
+
+        {progress && (
+          <div className="adhoc-progress">
+            {generating && <span className="grading-spinner"></span>}
+            {progress}
+          </div>
+        )}
+
+        <div className="form-actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={onCancel}
+            disabled={generating}
+          >
+            Abbrechen
+          </button>
+          <button
+            type="submit"
+            className="btn-primary-sm"
+            disabled={generating}
+          >
+            {generating ? "Wird generiert..." : "Klassenarbeit generieren"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function TaskPreview({ task, expanded, onToggle, children }) {
+  const TYPE_LABELS = {
+    multichoice: "Multiple Choice",
+    truefalse: "Wahr/Falsch",
+    shortanswer: "Kurzantwort",
+    numerical: "Numerisch",
+    matching: "Zuordnung",
+    ordering: "Reihenfolge",
+    cloze: "Lückentext",
+    essay: "Freitext",
+    description: "Beschreibung",
+  };
+
+  return (
+    <div className={`task-preview-wrapper ${expanded ? "task-preview-expanded" : ""}`}>
+      <div className="task-preview-header" onClick={onToggle}>
+        <div className="exam-task-info">
+          <strong>{task.title}</strong>
+          <span className="task-type-badge">{TYPE_LABELS[task.task_type] || task.task_type}</span>
+          {!expanded && (
+            <span className="task-text-preview">
+              {task.text.substring(0, 100)}{task.text.length > 100 ? "..." : ""}
+            </span>
+          )}
+        </div>
+        <span className="task-points">{task.points} Pkt.</span>
+        {children}
+        <button className="btn-small btn-preview-toggle" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
+          {expanded ? "▲" : "▼"}
+        </button>
+      </div>
+      {expanded && (
+        <div className="task-preview-body">
+          <div className="task-preview-text">{task.text}</div>
+          {task.hint && <div className="task-preview-hint">Hinweis: {task.hint}</div>}
+          <div className="task-preview-question">
+            <QuestionRenderer
+              task={task}
+              answer=""
+              onChange={() => {}}
+              disabled={true}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExamDetail({ exam, onBack }) {
   const [examTasks, setExamTasks] = useState([]);
   const [pools, setPools] = useState([]);
@@ -272,6 +519,8 @@ function ExamDetail({ exam, onBack }) {
   const [poolTasks, setPoolTasks] = useState([]);
   const [search, setSearch] = useState("");
   const [showPool, setShowPool] = useState(false);
+  const [expandedExamTask, setExpandedExamTask] = useState(null);
+  const [expandedPoolTask, setExpandedPoolTask] = useState(null);
 
   useEffect(() => {
     loadExamTasks();
@@ -347,22 +596,20 @@ function ExamDetail({ exam, onBack }) {
         ) : (
           <div className="exam-task-list">
             {examTasks.map((task, index) => (
-              <div key={task.id} className="exam-task-item">
+              <div key={task.id} className="exam-task-item-wrap">
                 <span className="exam-task-pos">{index + 1}.</span>
-                <div className="exam-task-info">
-                  <strong>{task.title}</strong>
-                  <span className="task-text-preview">
-                    {task.text.substring(0, 100)}
-                    {task.text.length > 100 ? "..." : ""}
-                  </span>
-                </div>
-                <span className="task-points">{task.points} Pkt.</span>
-                <button
-                  className="btn-small btn-danger"
-                  onClick={() => removeTask(task.id)}
+                <TaskPreview
+                  task={task}
+                  expanded={expandedExamTask === task.id}
+                  onToggle={() => setExpandedExamTask(expandedExamTask === task.id ? null : task.id)}
                 >
-                  Entfernen
-                </button>
+                  <button
+                    className="btn-small btn-danger"
+                    onClick={(e) => { e.stopPropagation(); removeTask(task.id); }}
+                  >
+                    Entfernen
+                  </button>
+                </TaskPreview>
               </div>
             ))}
           </div>
@@ -404,20 +651,19 @@ function ExamDetail({ exam, onBack }) {
             </div>
             <div className="pool-task-list">
               {availableTasks.map((task) => (
-                <div key={task.id} className="pool-task-item">
-                  <div className="exam-task-info">
-                    <strong>{task.title}</strong>
-                    <span className="task-text-preview">
-                      {task.text.substring(0, 80)}...
-                    </span>
-                  </div>
-                  <span className="task-points">{task.points} Pkt.</span>
-                  <button
-                    className="btn-primary-sm"
-                    onClick={() => addTask(task.id)}
+                <div key={task.id} className="pool-task-item-wrap">
+                  <TaskPreview
+                    task={task}
+                    expanded={expandedPoolTask === task.id}
+                    onToggle={() => setExpandedPoolTask(expandedPoolTask === task.id ? null : task.id)}
                   >
-                    Hinzufügen
-                  </button>
+                    <button
+                      className="btn-primary-sm"
+                      onClick={(e) => { e.stopPropagation(); addTask(task.id); }}
+                    >
+                      Hinzufügen
+                    </button>
+                  </TaskPreview>
                 </div>
               ))}
               {availableTasks.length === 0 && (

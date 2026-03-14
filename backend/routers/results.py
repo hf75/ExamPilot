@@ -80,7 +80,7 @@ async def get_student_result(
     session = dict(session)
 
     cursor = await db.execute(
-        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points, t.hint
+        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points, t.hint, t.solution
            FROM answers a
            JOIN tasks t ON t.id = a.task_id
            WHERE a.session_id = ?""",

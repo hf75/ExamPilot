@@ -1,8 +1,10 @@
 import json
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 import aiosqlite
 
 from database import get_db
+from config import DB_PATH
 from models import StudentJoinRequest, AnswerSubmit, AnswerDispute
 from services.claude_service import grade_answer
 from services.auto_grader import is_auto_gradable, grade_auto
@@ -93,7 +95,7 @@ async def get_session(
         (session_dict["exam_id"],),
     )
     tasks_raw = [dict(row) for row in await cursor.fetchall()]
-    # Parse question_data from JSON string
+    # Parse question_data and strip sensitive fields so students can't see solutions
     tasks = []
     for t in tasks_raw:
         qd = t.get("question_data", "{}")
@@ -101,6 +103,13 @@ async def get_session(
             t["question_data"] = json.loads(qd) if isinstance(qd, str) else qd
         except (json.JSONDecodeError, TypeError):
             t["question_data"] = {}
+        # Remove fields that reveal answers to the student
+        t.pop("solution", None)
+        t.pop("grader_info", None)
+        # Strip correct-answer info from question_data for essay/shortanswer
+        qd_clean = t["question_data"]
+        if t.get("task_type") == "essay" and isinstance(qd_clean, dict):
+            qd_clean.pop("grader_info", None)
         tasks.append(t)
 
     # Get existing answers
@@ -119,6 +128,54 @@ async def get_session(
         "tasks": tasks,
         "answers": answers,
     }
+
+
+async def _grade_in_background(answer_id: int, task: dict, student_answer: str):
+    """Run AI grading in background and update the answer when done."""
+    task_type = task["task_type"]
+    qd = task.get("question_data", "{}")
+    try:
+        question_data = json.loads(qd) if isinstance(qd, str) else (qd or {})
+    except (json.JSONDecodeError, TypeError):
+        question_data = {}
+
+    grading_result = None
+    try:
+        grading_result = await grade_answer(
+            task_text=task["text"],
+            task_hint=task["hint"] or "",
+            task_type=task_type,
+            student_answer=student_answer,
+            max_points=task["points"],
+            question_data=question_data,
+            solution=task.get("solution", ""),
+        )
+    except Exception:
+        pass
+
+    # Write result back with a fresh DB connection
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        await db.execute("PRAGMA journal_mode=WAL")
+        if grading_result:
+            await db.execute(
+                """UPDATE answers SET
+                   points_awarded = ?, is_correct = ?, feedback = ?,
+                   graded_at = CURRENT_TIMESTAMP, grading_status = 'graded'
+                   WHERE id = ?""",
+                (
+                    grading_result.get("points", 0),
+                    grading_result.get("correct", False),
+                    grading_result.get("feedback", ""),
+                    answer_id,
+                ),
+            )
+        else:
+            # Grading failed — mark as graded anyway so task isn't stuck locked
+            await db.execute(
+                "UPDATE answers SET grading_status = 'error' WHERE id = ?",
+                (answer_id,),
+            )
+        await db.commit()
 
 
 @router.post("/answer")
@@ -152,36 +209,28 @@ async def submit_answer(
     except (json.JSONDecodeError, TypeError):
         question_data = {}
 
-    # Grade based on task type
-    grading_result = None
-    if task_type == "description":
-        # No grading for description tasks
-        grading_result = {"points": 0, "correct": True, "feedback": ""}
-    elif is_auto_gradable(task_type):
-        # Auto-grade locally (instant)
-        grading_result = grade_auto(task_type, question_data, req.student_answer, task["points"])
-    elif task_type in ("essay", "shortanswer"):
-        # AI grading via Claude
-        try:
-            grading_result = await grade_answer(
-                task_text=task["text"],
-                task_hint=task["hint"] or "",
-                task_type=task_type,
-                student_answer=req.student_answer,
-                max_points=task["points"],
-                question_data=question_data,
-            )
-        except Exception:
-            grading_result = None
-
-    # Upsert answer
+    # Check if this task is currently being graded by AI
     cursor = await db.execute(
-        "SELECT id FROM answers WHERE session_id = ? AND task_id = ?",
+        "SELECT id, grading_status FROM answers WHERE session_id = ? AND task_id = ?",
         (req.session_id, req.task_id),
     )
     existing = await cursor.fetchone()
+    if existing and existing[1] == "pending":
+        raise HTTPException(status_code=409, detail="Aufgabe wird gerade bewertet")
 
+    # Grade based on task type
+    needs_ai_grading = task_type in ("essay", "shortanswer")
+
+    if task_type == "description":
+        grading_result = {"points": 0, "correct": True, "feedback": ""}
+    elif is_auto_gradable(task_type):
+        grading_result = grade_auto(task_type, question_data, req.student_answer, task["points"])
+    else:
+        grading_result = None
+
+    # Upsert answer
     if grading_result:
+        # Auto-graded or description — save with result immediately
         values = (
             req.student_answer,
             grading_result.get("points", 0),
@@ -192,17 +241,55 @@ async def submit_answer(
             await db.execute(
                 """UPDATE answers SET student_answer = ?,
                    points_awarded = ?, is_correct = ?, feedback = ?,
-                   graded_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                   graded_at = CURRENT_TIMESTAMP, grading_status = 'graded'
+                   WHERE id = ?""",
                 (*values, existing[0]),
             )
         else:
             await db.execute(
                 """INSERT INTO answers (session_id, task_id, student_answer,
-                   points_awarded, is_correct, feedback, graded_at)
-                   VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                   points_awarded, is_correct, feedback, graded_at, grading_status)
+                   VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'graded')""",
                 (req.session_id, req.task_id, *values),
             )
+        await db.commit()
+        return {
+            "message": "Antwort gespeichert",
+            "graded": True,
+            "grading_status": "graded",
+            "points": grading_result.get("points", 0),
+            "correct": grading_result.get("correct"),
+            "feedback": grading_result.get("feedback", ""),
+        }
+    elif needs_ai_grading:
+        # Save answer with pending status, grade in background
+        if existing:
+            await db.execute(
+                """UPDATE answers SET student_answer = ?, grading_status = 'pending',
+                   points_awarded = NULL, is_correct = NULL, feedback = NULL, graded_at = NULL
+                   WHERE id = ?""",
+                (req.student_answer, existing[0]),
+            )
+            answer_id = existing[0]
+        else:
+            cursor = await db.execute(
+                """INSERT INTO answers (session_id, task_id, student_answer, grading_status)
+                   VALUES (?, ?, ?, 'pending')""",
+                (req.session_id, req.task_id, req.student_answer),
+            )
+            answer_id = cursor.lastrowid
+        await db.commit()
+
+        # Launch background grading
+        asyncio.create_task(_grade_in_background(answer_id, task, req.student_answer))
+
+        return {
+            "message": "Antwort gespeichert, Bewertung läuft",
+            "graded": False,
+            "grading_status": "pending",
+        }
     else:
+        # Unknown type — just save
         if existing:
             await db.execute(
                 "UPDATE answers SET student_answer = ? WHERE id = ?",
@@ -213,16 +300,25 @@ async def submit_answer(
                 "INSERT INTO answers (session_id, task_id, student_answer) VALUES (?, ?, ?)",
                 (req.session_id, req.task_id, req.student_answer),
             )
+        await db.commit()
+        return {
+            "message": "Antwort gespeichert",
+            "graded": False,
+            "grading_status": None,
+        }
 
-    await db.commit()
 
-    return {
-        "message": "Antwort gespeichert",
-        "graded": grading_result is not None,
-        "points": grading_result.get("points", 0) if grading_result else None,
-        "correct": grading_result.get("correct") if grading_result else None,
-        "feedback": grading_result.get("feedback", "") if grading_result else None,
-    }
+@router.get("/grading-status/{session_id}")
+async def get_grading_status(
+    session_id: int, db: aiosqlite.Connection = Depends(get_db)
+):
+    """Returns grading status for all answers in a session."""
+    cursor = await db.execute(
+        "SELECT task_id, grading_status FROM answers WHERE session_id = ?",
+        (session_id,),
+    )
+    rows = await cursor.fetchall()
+    return {str(row[0]): row[1] for row in rows}
 
 
 @router.post("/submit/{session_id}")
@@ -319,7 +415,7 @@ async def get_results(
         raise HTTPException(status_code=400, detail="Klassenarbeit noch nicht abgegeben")
 
     cursor = await db.execute(
-        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points
+        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points, t.solution
            FROM answers a
            JOIN tasks t ON t.id = a.task_id
            WHERE a.session_id = ?""",

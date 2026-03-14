@@ -24,6 +24,7 @@ class TaskCreate(BaseModel):
     title: str
     text: str
     hint: Optional[str] = None
+    solution: Optional[str] = None
     topic: Optional[str] = None
     task_type: str = "essay"
     points: int = 1
@@ -36,6 +37,7 @@ class TaskUpdate(BaseModel):
     title: Optional[str] = None
     text: Optional[str] = None
     hint: Optional[str] = None
+    solution: Optional[str] = None
     topic: Optional[str] = None
     task_type: Optional[str] = None
     points: Optional[int] = None
@@ -47,6 +49,7 @@ class TaskOut(BaseModel):
     title: str
     text: str
     hint: Optional[str] = None
+    solution: Optional[str] = None
     topic: Optional[str] = None
     task_type: str
     points: int

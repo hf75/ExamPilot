@@ -10,3 +10,4 @@ frontend/dist/
 dist/
 build/
 *.spec.bak
+.claude/

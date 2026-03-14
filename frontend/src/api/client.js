@@ -41,9 +41,32 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+async function requestForm(path, formData) {
+  const url = `${API_BASE}${path}`;
+  const headers = {};
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  // No Content-Type — browser sets multipart boundary automatically
+  const res = await fetch(url, { method: "POST", headers, body: formData });
+
+  if (res.status === 401) {
+    clearToken();
+    window.location.href = "/login";
+    throw new Error("Nicht autorisiert");
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Fehler: ${res.status}`);
+  }
+  return res.json();
+}
+
 export const api = {
   get: (path) => request(path),
   post: (path, body) => request(path, { method: "POST", body: JSON.stringify(body) }),
+  postForm: (path, formData) => requestForm(path, formData),
   put: (path, body) => request(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: (path) => request(path, { method: "DELETE" }),
 };

@@ -47,6 +47,7 @@ export default function TaskEditor({ task, poolId, onSave, onCancel }) {
     title: task?.title || "",
     text: task?.text || "",
     hint: task?.hint || "",
+    solution: task?.solution || "",
     topic: task?.topic || "",
     task_type: task?.task_type || "essay",
     points: task?.points || 1,
@@ -150,12 +151,22 @@ export default function TaskEditor({ task, poolId, onSave, onCancel }) {
         </div>
 
         <div className="form-group">
-          <label>Erwartete Lösung / Hinweis für die Bewertung</label>
+          <label>Hinweis für Schüler (wird während der Prüfung angezeigt)</label>
           <textarea
             value={form.hint}
             onChange={(e) => update("hint", e.target.value)}
-            placeholder="Lösungshinweis (wird auch für KI-Bewertung genutzt)"
+            placeholder="Optionaler Hinweis für den Schüler..."
             rows={2}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Musterlösung (wird nach der Prüfung angezeigt und für KI-Bewertung genutzt)</label>
+          <textarea
+            value={form.solution}
+            onChange={(e) => update("solution", e.target.value)}
+            placeholder="Ausführliche Musterlösung..."
+            rows={3}
           />
         </div>
 

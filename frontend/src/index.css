@@ -242,6 +242,58 @@ a:hover {
   gap: 12px;
 }
 
+.page-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-adhoc {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+.btn-adhoc:hover {
+  background: rgba(34, 209, 142, 0.1) !important;
+}
+
+/* Ad-Hoc Exam Form */
+.adhoc-description {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.adhoc-file-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.adhoc-file-tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(34, 209, 142, 0.12);
+  color: var(--accent);
+}
+
+.adhoc-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(34, 209, 142, 0.08);
+  border: 1px solid rgba(34, 209, 142, 0.2);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
 .header-actions {
   display: flex;
   gap: 8px;
@@ -773,6 +825,95 @@ a:hover {
   white-space: nowrap;
 }
 
+/* Task Preview in ExamBuilder */
+.exam-task-item-wrap,
+.pool-task-item-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.exam-task-item-wrap .exam-task-pos {
+  padding-top: 12px;
+}
+
+.task-preview-wrapper {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  transition: border-color 0.15s;
+}
+
+.task-preview-wrapper:hover {
+  border-color: var(--accent);
+}
+
+.task-preview-expanded {
+  border-color: var(--accent);
+}
+
+.task-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.task-type-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(34, 209, 142, 0.15);
+  color: var(--accent);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.btn-preview-toggle {
+  background: none !important;
+  border: none !important;
+  color: var(--text-secondary) !important;
+  font-size: 12px !important;
+  padding: 4px 6px !important;
+  min-width: auto !important;
+  cursor: pointer;
+}
+
+.btn-preview-toggle:hover {
+  color: var(--accent) !important;
+}
+
+.task-preview-body {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--border);
+  margin-top: 0;
+}
+
+.task-preview-text {
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 12px 0;
+  white-space: pre-wrap;
+}
+
+.task-preview-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+  padding-bottom: 12px;
+}
+
+.task-preview-question {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
 .pool-header {
   display: flex;
   justify-content: space-between;
@@ -934,6 +1075,47 @@ a:hover {
 .task-nav-check {
   color: var(--accent);
   font-size: 14px;
+}
+
+.task-nav-item.grading {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.task-nav-grading {
+  color: #f59e0b;
+  font-size: 14px;
+  animation: spin 1.2s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Grading lock banner */
+.grading-lock-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius);
+  color: #f59e0b;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.grading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(245, 158, 11, 0.3);
+  border-top-color: #f59e0b;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 
 /* Exam Main Content */

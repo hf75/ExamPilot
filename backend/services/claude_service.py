@@ -37,6 +37,7 @@ async def grade_answer(
     student_answer: str,
     max_points: int,
     question_data: dict | None = None,
+    solution: str = "",
 ) -> dict:
     """Grade essay or shortanswer using Claude. Returns {points, correct, feedback}."""
 
@@ -79,9 +80,11 @@ Antworte als JSON:
   "feedback": "Begründung mit Hinweis was fehlte oder falsch war"
 }}"""
 
+    solution_text = solution or task_hint or "Keine Angabe"
     user_message = f"""Aufgabe: {task_text}
 
-Erwartete Lösung / Hinweis: {task_hint or "Keine Angabe"}
+Musterlösung: {solution_text}
+{f"Zusätzlicher Hinweis: {task_hint}" if task_hint and solution else ""}
 
 Antwort des Schülers: {student_answer}
 
@@ -128,7 +131,8 @@ Antworte als JSON-Array:
   {{
     "title": "Aufgabe 1",
     "text": "Aufgabenstellung...",
-    "hint": "Erwartete Lösung / Lösungshinweis",
+    "hint": "Optionaler Hinweis für den Schüler",
+    "solution": "Ausführliche Musterlösung (wird nach der Prüfung angezeigt und zur Bewertung genutzt)",
     "topic": "{topic}",
     "task_type": "multichoice|truefalse|shortanswer|numerical|matching|essay|ordering",
     "points": 1-5,
@@ -160,6 +164,7 @@ question_data Struktur je nach Typ:
 async def ai_edit_task(
     title: str, text: str, hint: str, points: int, prompt: str,
     task_type: str = "essay", question_data: dict | None = None,
+    solution: str = "",
 ) -> dict:
     """Edit a task based on a teacher's natural language instruction."""
 
@@ -185,7 +190,8 @@ question_data Struktur je nach Typ:
 
 Titel: {title}
 Text: {text}
-Erwartete Lösung: {hint or "Keine Angabe"}
+Hinweis: {hint or "Keiner"}
+Musterlösung: {solution or "Keine Angabe"}
 Punkte: {points}
 Aufgabentyp: {task_type}
 Aufgabendaten: {qdata_str}
@@ -198,6 +204,7 @@ Antworte als JSON:
   "title": "...",
   "text": "...",
   "hint": "...",
+  "solution": "Ausführliche Musterlösung",
   "points": ...,
   "task_type": "...",
   "question_data": {{ ... }}

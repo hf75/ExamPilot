@@ -160,9 +160,14 @@ export default function StudentResult() {
               </div>
             )}
 
+            {answer.solution && (
+              <div className="result-feedback" style={{ borderLeftColor: "var(--accent)" }}>
+                <strong>Musterlösung:</strong> {answer.solution}
+              </div>
+            )}
             {answer.hint && (
               <div className="result-feedback" style={{ borderLeftColor: "var(--border)" }}>
-                <strong>Erwartete Lösung:</strong> {answer.hint}
+                <strong>Hinweis:</strong> {answer.hint}
               </div>
             )}
 
