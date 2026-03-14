@@ -331,9 +331,14 @@ export default function TaskPool() {
                 </div>
               </div>
               <p className="task-text">{task.text}</p>
-              {task.hint && (
+              {task.solution && (
                 <p className="task-hint">
-                  <strong>Lösung:</strong> {task.hint}
+                  <strong>Musterlösung:</strong> {task.solution}
+                </p>
+              )}
+              {task.hint && (
+                <p className="task-hint" style={{ opacity: 0.7 }}>
+                  <strong>Hinweis:</strong> {task.hint}
                 </p>
               )}
               <div className="task-actions">
@@ -464,6 +469,7 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
           title: task.title,
           text: task.text,
           hint: task.hint || "",
+          solution: task.solution || "",
           topic: task.topic || "",
           task_type: task.task_type || "essay",
           points: task.points || 1,
@@ -600,6 +606,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
           title: task.title,
           text: task.text,
           hint: task.hint || "",
+          solution: task.solution || "",
           topic: task.topic || topic,
           task_type: task.task_type || "essay",
           points: task.points || 1,
@@ -683,9 +690,9 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
                     </span>
                   </div>
                   <p>{task.text}</p>
-                  {task.hint && (
+                  {task.solution && (
                     <p className="task-hint">
-                      <em>Lösung: {task.hint}</em>
+                      <em>Musterlösung: {task.solution}</em>
                     </p>
                   )}
                 </div>
@@ -753,6 +760,7 @@ function MoodleImportModal({ poolId, onClose, onImported }) {
           title: task.title,
           text: task.text,
           hint: task.hint || "",
+          solution: task.solution || "",
           topic: task.topic || "",
           task_type: task.task_type || "essay",
           points: task.points || 1,
