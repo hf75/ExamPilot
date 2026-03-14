@@ -29,9 +29,9 @@ async def create_exam(
     _: bool = Depends(require_teacher),
 ):
     cursor = await db.execute(
-        """INSERT INTO exams (title, description, class_name, date, duration_minutes)
-           VALUES (?, ?, ?, ?, ?)""",
-        (exam.title, exam.description, exam.class_name, exam.date, exam.duration_minutes),
+        """INSERT INTO exams (title, description, class_name, date, duration_minutes, password)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (exam.title, exam.description, exam.class_name, exam.date, exam.duration_minutes, exam.password or None),
     )
     await db.commit()
     exam_id = cursor.lastrowid

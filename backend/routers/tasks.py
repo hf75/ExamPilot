@@ -17,6 +17,7 @@ class GenerateRequest(BaseModel):
     topic: str
     count: int = 5
     difficulty: str = "mittel"
+    instructions: str = ""
 
 
 class AiEditRequest(BaseModel):
@@ -148,7 +149,7 @@ async def generate_tasks_endpoint(
     _: bool = Depends(require_teacher),
 ):
     try:
-        tasks = await ai_generate_tasks(req.topic, req.count, req.difficulty)
+        tasks = await ai_generate_tasks(req.topic, req.count, req.difficulty, req.instructions)
         return {"tasks": tasks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"KI-Generierung fehlgeschlagen: {str(e)}")

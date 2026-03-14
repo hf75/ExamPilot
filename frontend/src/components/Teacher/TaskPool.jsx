@@ -11,6 +11,7 @@ const TASK_TYPES = {
   ordering: "Reihenfolge",
   cloze: "Lückentext",
   essay: "Freitext",
+  drawing: "Zeichnung",
   description: "Beschreibung",
 };
 
@@ -577,6 +578,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState("mittel");
+  const [instructions, setInstructions] = useState("");
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -589,6 +591,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
         topic,
         count,
         difficulty,
+        instructions: instructions.trim() || undefined,
       });
       setPreview(data.tasks);
     } catch (err) {
@@ -668,6 +671,15 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
                   <option value="schwer">Schwer</option>
                 </select>
               </div>
+            </div>
+            <div className="form-group">
+              <label>Zusätzliche Anweisungen (optional)</label>
+              <textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="z.B. 'Die Datenbank-ERMs sollen von den Schülern gezeichnet werden' oder 'Nur Multiple-Choice-Fragen'"
+                rows={3}
+              />
             </div>
             <button
               className="btn-primary"

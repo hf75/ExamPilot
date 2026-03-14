@@ -6,6 +6,7 @@ export default function JoinExam() {
   const [exams, setExams] = useState([]);
   const [name, setName] = useState("");
   const [selectedExam, setSelectedExam] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -23,10 +24,10 @@ export default function JoinExam() {
     }
 
     try {
-      const data = await api.post("/api/student/join", {
-        name,
-        exam_id: parseInt(selectedExam),
-      });
+      const payload = { name, exam_id: parseInt(selectedExam) };
+      const exam = exams.find((e) => String(e.id) === selectedExam);
+      if (exam?.has_password) payload.password = password;
+      const data = await api.post("/api/student/join", payload);
       navigate(`/exam/${data.session_id}`);
     } catch (err) {
       setError(err.message);
@@ -73,6 +74,19 @@ export default function JoinExam() {
                 ))}
               </select>
             </div>
+            {exams.find((e) => String(e.id) === selectedExam)?.has_password && (
+              <div className="form-group">
+                <label htmlFor="password">Passwort</label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Zugangscode eingeben"
+                  required
+                />
+              </div>
+            )}
             <button type="submit" className="btn-primary">
               Prüfung starten
             </button>

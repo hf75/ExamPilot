@@ -16,10 +16,15 @@ router = APIRouter(prefix="/api/student", tags=["student"])
 @router.get("/exams")
 async def list_active_exams(db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute(
-        "SELECT id, title, class_name, date, duration_minutes FROM exams WHERE status = 'active'"
+        "SELECT id, title, class_name, date, duration_minutes, password FROM exams WHERE status = 'active'"
     )
     rows = await cursor.fetchall()
-    return [dict(row) for row in rows]
+    result = []
+    for row in rows:
+        d = dict(row)
+        d["has_password"] = bool(d.pop("password", None))
+        result.append(d)
+    return result
 
 
 @router.post("/join")
@@ -28,11 +33,15 @@ async def join_exam(
 ):
     # Check exam is active
     cursor = await db.execute(
-        "SELECT id, title FROM exams WHERE id = ? AND status = 'active'", (req.exam_id,)
+        "SELECT id, title, password FROM exams WHERE id = ? AND status = 'active'", (req.exam_id,)
     )
     exam = await cursor.fetchone()
     if not exam:
         raise HTTPException(status_code=404, detail="Keine aktive Klassenarbeit mit dieser ID gefunden")
+
+    # Check password if exam has one
+    if exam["password"] and exam["password"] != (req.password or ""):
+        raise HTTPException(status_code=403, detail="Falsches Passwort")
 
     # Find or create student
     cursor = await db.execute(
@@ -108,7 +117,7 @@ async def get_session(
         t.pop("grader_info", None)
         # Strip correct-answer info from question_data for essay/shortanswer
         qd_clean = t["question_data"]
-        if t.get("task_type") == "essay" and isinstance(qd_clean, dict):
+        if t.get("task_type") in ("essay", "drawing") and isinstance(qd_clean, dict):
             qd_clean.pop("grader_info", None)
         tasks.append(t)
 
@@ -219,7 +228,9 @@ async def submit_answer(
         raise HTTPException(status_code=409, detail="Aufgabe wird gerade bewertet")
 
     # Grade based on task type
+    # Drawing is AI-graded but only on explicit request (not auto-save)
     needs_ai_grading = task_type in ("essay", "shortanswer")
+    grade_later = task_type == "drawing"  # save only, grade on navigation/submit
 
     if task_type == "description":
         grading_result = {"points": 0, "correct": True, "feedback": ""}
@@ -288,6 +299,25 @@ async def submit_answer(
             "graded": False,
             "grading_status": "pending",
         }
+    elif grade_later:
+        # Save without grading (drawing: graded on explicit trigger)
+        if existing:
+            await db.execute(
+                "UPDATE answers SET student_answer = ?, grading_status = NULL WHERE id = ?",
+                (req.student_answer, existing[0]),
+            )
+        else:
+            await db.execute(
+                """INSERT INTO answers (session_id, task_id, student_answer)
+                   VALUES (?, ?, ?)""",
+                (req.session_id, req.task_id, req.student_answer),
+            )
+        await db.commit()
+        return {
+            "message": "Antwort gespeichert",
+            "graded": False,
+            "grading_status": "saved",
+        }
     else:
         # Unknown type — just save
         if existing:
@@ -321,6 +351,38 @@ async def get_grading_status(
     return {str(row[0]): row[1] for row in rows}
 
 
+@router.post("/grade-drawing")
+async def grade_drawing(
+    req: AnswerSubmit, db: aiosqlite.Connection = Depends(get_db)
+):
+    """Explicitly trigger AI grading for a drawing task (called on navigation away)."""
+    cursor = await db.execute(
+        "SELECT id, grading_status, student_answer FROM answers WHERE session_id = ? AND task_id = ?",
+        (req.session_id, req.task_id),
+    )
+    answer = await cursor.fetchone()
+    if not answer or not answer[2]:
+        return {"message": "Keine Zeichnung vorhanden"}
+    if answer[1] == "pending":
+        return {"message": "Bewertung läuft bereits", "grading_status": "pending"}
+
+    # Get task data
+    cursor = await db.execute("SELECT * FROM tasks WHERE id = ?", (req.task_id,))
+    task = await cursor.fetchone()
+    if not task:
+        return {"message": "Aufgabe nicht gefunden"}
+    task = dict(task)
+
+    # Mark as pending and launch grading
+    await db.execute(
+        "UPDATE answers SET grading_status = 'pending' WHERE id = ?", (answer[0],)
+    )
+    await db.commit()
+    asyncio.create_task(_grade_in_background(answer[0], task, answer[2]))
+
+    return {"message": "Bewertung gestartet", "grading_status": "pending"}
+
+
 @router.post("/submit/{session_id}")
 async def submit_exam(
     session_id: int, db: aiosqlite.Connection = Depends(get_db)
@@ -333,6 +395,31 @@ async def submit_exam(
         raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
     if session[0] != "in_progress":
         raise HTTPException(status_code=400, detail="Bereits abgegeben")
+
+    # Trigger grading for any ungraded drawing tasks
+    cursor = await db.execute(
+        """SELECT a.id, t.*, a.student_answer FROM answers a
+           JOIN tasks t ON t.id = a.task_id
+           WHERE a.session_id = ? AND t.task_type = 'drawing'
+           AND a.student_answer IS NOT NULL AND a.student_answer != ''
+           AND (a.grading_status IS NULL OR a.grading_status = 'saved')""",
+        (session_id,),
+    )
+    ungraded_drawings = [dict(row) for row in await cursor.fetchall()]
+    if ungraded_drawings:
+        # Mark all as pending
+        for row in ungraded_drawings:
+            await db.execute(
+                "UPDATE answers SET grading_status = 'pending' WHERE id = ?", (row["id"],)
+            )
+        await db.commit()
+
+        # Grade all drawings and wait for completion before calculating points
+        grading_tasks = [
+            _grade_in_background(row["id"], row, row["student_answer"])
+            for row in ungraded_drawings
+        ]
+        await asyncio.gather(*grading_tasks, return_exceptions=True)
 
     # Calculate total points
     cursor = await db.execute(

@@ -106,6 +106,38 @@ export default function ExamView() {
     [sessionId]
   );
 
+  // Trigger drawing grading when navigating away from a drawing task
+  const triggerDrawingGrade = useCallback(
+    async (taskId, answer) => {
+      if (!answer || !answer.startsWith("data:image")) return;
+      try {
+        const result = await api.post("/api/student/grade-drawing", {
+          session_id: parseInt(sessionId),
+          task_id: taskId,
+          student_answer: answer,
+        });
+        if (result.grading_status === "pending") {
+          setGradingTasks((prev) => new Set([...prev, taskId]));
+        }
+      } catch {
+        // ignore
+      }
+    },
+    [sessionId]
+  );
+
+  function handleNavigate(newIndex) {
+    // If leaving a drawing task, save immediately then trigger grading
+    const currentT = tasks[currentTaskIndex];
+    if (currentT?.task_type === "drawing" && answers[currentT.id]) {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      autoSave(currentT.id, answers[currentT.id]).then(() => {
+        triggerDrawingGrade(currentT.id, answers[currentT.id]);
+      });
+    }
+    setCurrentTaskIndex(newIndex);
+  }
+
   function handleAnswerChange(taskId, value) {
     if (gradingTasks.has(taskId)) return; // locked while grading
     setAnswers((prev) => ({ ...prev, [taskId]: value }));
@@ -118,7 +150,10 @@ export default function ExamView() {
   async function handleSubmitExam() {
     setSubmitting(true);
     try {
-      // Save answers that are not currently being graded
+      // Cancel any pending auto-save timer
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+      // Save all answers that are not currently being graded
       const savePromises = Object.entries(answers)
         .filter(([taskId]) => !gradingTasks.has(parseInt(taskId)))
         .map(([taskId, answer]) =>
@@ -214,64 +249,117 @@ export default function ExamView() {
           currentIndex={currentTaskIndex}
           answers={answers}
           gradingTasks={gradingTasks}
-          onSelect={setCurrentTaskIndex}
+          onSelect={handleNavigate}
         />
 
-        <div className="exam-main">
-          {currentTask && (
-            <>
-              <div className="task-header-exam">
-                <h3>
-                  {currentTask.title}{" "}
-                  {currentTask.task_type !== "description" && (
-                    <span className="task-points-badge">
-                      {currentTask.points} Pkt.
-                    </span>
-                  )}
-                </h3>
-              </div>
-              {currentTask.task_type !== "cloze" && (
-                <div className="task-text-exam">{currentTask.text}</div>
-              )}
+        <div className={`exam-main ${currentTask?.task_type === "drawing" ? "exam-main-drawing" : ""}`}>
+          {currentTask && currentTask.task_type === "drawing" ? (
+                <div className="drawing-split-layout">
+                  <div className="drawing-split-left">
+                    <div className="task-header-exam">
+                      <h3>
+                        {currentTask.title}{" "}
+                        <span className="task-points-badge">
+                          {currentTask.points} Pkt.
+                        </span>
+                      </h3>
+                    </div>
+                    <div className="task-text-exam">{currentTask.text}</div>
 
-              {gradingTasks.has(currentTask.id) && (
-                <div className="grading-lock-banner">
-                  <span className="grading-spinner"></span>
-                  Antwort wird bewertet — bitte warten...
+                    {gradingTasks.has(currentTask.id) && (
+                      <div className="grading-lock-banner">
+                        <span className="grading-spinner"></span>
+                        Antwort wird bewertet — bitte warten...
+                      </div>
+                    )}
+
+                    <div className="task-nav-buttons">
+                      <button
+                        className="btn-secondary"
+                        onClick={() =>
+                          handleNavigate(Math.max(0, currentTaskIndex - 1))
+                        }
+                        disabled={currentTaskIndex === 0}
+                      >
+                        &larr; Vorherige
+                      </button>
+                      <button
+                        className="btn-secondary"
+                        onClick={() =>
+                          handleNavigate(
+                            Math.min(tasks.length - 1, currentTaskIndex + 1)
+                          )
+                        }
+                        disabled={currentTaskIndex === tasks.length - 1}
+                      >
+                        Nächste &rarr;
+                      </button>
+                    </div>
+                  </div>
+                  <div className="drawing-split-right">
+                    <QuestionRenderer
+                      task={currentTask}
+                      answer={answers[currentTask.id] || ""}
+                      onChange={(value) => handleAnswerChange(currentTask.id, value)}
+                      disabled={gradingTasks.has(currentTask.id)}
+                    />
+                  </div>
                 </div>
-              )}
+              ) : (
+                <>
+                  <div className="task-header-exam">
+                    <h3>
+                      {currentTask.title}{" "}
+                      {currentTask.task_type !== "description" && (
+                        <span className="task-points-badge">
+                          {currentTask.points} Pkt.
+                        </span>
+                      )}
+                    </h3>
+                  </div>
+                  {currentTask.task_type !== "cloze" && (
+                    <div className="task-text-exam">{currentTask.text}</div>
+                  )}
 
-              <QuestionRenderer
-                task={currentTask}
-                answer={answers[currentTask.id] || ""}
-                onChange={(value) => handleAnswerChange(currentTask.id, value)}
-                disabled={gradingTasks.has(currentTask.id)}
-              />
+                  {gradingTasks.has(currentTask.id) && (
+                    <div className="grading-lock-banner">
+                      <span className="grading-spinner"></span>
+                      Antwort wird bewertet — bitte warten...
+                    </div>
+                  )}
 
-              <div className="task-nav-buttons">
-                <button
-                  className="btn-secondary"
-                  onClick={() =>
-                    setCurrentTaskIndex(Math.max(0, currentTaskIndex - 1))
-                  }
-                  disabled={currentTaskIndex === 0}
-                >
-                  &larr; Vorherige
-                </button>
-                <button
-                  className="btn-secondary"
-                  onClick={() =>
-                    setCurrentTaskIndex(
-                      Math.min(tasks.length - 1, currentTaskIndex + 1)
-                    )
-                  }
-                  disabled={currentTaskIndex === tasks.length - 1}
-                >
-                  Nächste &rarr;
-                </button>
-              </div>
-            </>
-          )}
+                  <QuestionRenderer
+                    task={currentTask}
+                    answer={answers[currentTask.id] || ""}
+                    onChange={(value) => handleAnswerChange(currentTask.id, value)}
+                    disabled={gradingTasks.has(currentTask.id)}
+                  />
+
+                  <div className="task-nav-buttons">
+                    <button
+                      className="btn-secondary"
+                      onClick={() =>
+                        handleNavigate(Math.max(0, currentTaskIndex - 1))
+                      }
+                      disabled={currentTaskIndex === 0}
+                    >
+                      &larr; Vorherige
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      onClick={() =>
+                        handleNavigate(
+                          Math.min(tasks.length - 1, currentTaskIndex + 1)
+                        )
+                      }
+                      disabled={currentTaskIndex === tasks.length - 1}
+                    >
+                      Nächste &rarr;
+                    </button>
+                  </div>
+                </>
+              )
+          }
         </div>
       </div>
 

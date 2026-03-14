@@ -47,6 +47,7 @@ async def init_db():
                 duration_minutes INTEGER,
                 status TEXT DEFAULT 'draft',
                 show_results_immediately BOOLEAN DEFAULT TRUE,
+                password TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -138,6 +139,12 @@ async def init_db():
         """)
         try:
             await db.execute("ALTER TABLE tasks ADD COLUMN pool_id INTEGER REFERENCES task_pools(id) ON DELETE CASCADE")
+        except Exception:
+            pass
+
+        # Migration: optional password for exams
+        try:
+            await db.execute("ALTER TABLE exams ADD COLUMN password TEXT")
         except Exception:
             pass
 

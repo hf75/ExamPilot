@@ -8,6 +8,7 @@ const TASK_TYPES = {
   numerical: "Numerisch",
   matching: "Zuordnung",
   essay: "Freitext",
+  drawing: "Zeichnung",
   cloze: "Lückentext",
   ordering: "Reihenfolge",
   description: "Beschreibung",
@@ -32,6 +33,8 @@ function getDefaultQuestionData(type) {
       return { horizontal: false, items: ["", ""] };
     case "essay":
       return { grader_info: "" };
+    case "drawing":
+      return { grader_info: "", canvas_width: 1600, canvas_height: 800 };
     case "cloze":
       return { gaps: [] };
     case "description":
@@ -202,6 +205,9 @@ export default function TaskEditor({ task, poolId, onSave, onCancel }) {
           )}
           {form.task_type === "essay" && (
             <EssayConfig qd={qd} onChange={updateQD} />
+          )}
+          {form.task_type === "drawing" && (
+            <DrawingConfig qd={qd} onChange={updateQD} />
           )}
           {form.task_type === "cloze" && (
             <ClozeConfig qd={qd} onChange={updateQD} />
@@ -549,6 +555,47 @@ function EssayConfig({ qd, onChange }) {
           value={qd.grader_info || ""}
           onChange={(e) => onChange({ grader_info: e.target.value })}
           placeholder="Bewertungskriterien und erwartete Inhalte für die KI-Bewertung..."
+          rows={3}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DrawingConfig({ qd, onChange }) {
+  return (
+    <div className="qd-section">
+      <h4>Zeichnung-Konfiguration</h4>
+      <div className="form-row">
+        <div className="form-group">
+          <label>Canvas-Breite (px)</label>
+          <input
+            type="number"
+            min="400"
+            max="1920"
+            step="50"
+            value={qd.canvas_width || 800}
+            onChange={(e) => onChange({ canvas_width: parseInt(e.target.value) || 800 })}
+          />
+        </div>
+        <div className="form-group">
+          <label>Canvas-Höhe (px)</label>
+          <input
+            type="number"
+            min="200"
+            max="1080"
+            step="50"
+            value={qd.canvas_height || 400}
+            onChange={(e) => onChange({ canvas_height: parseInt(e.target.value) || 400 })}
+          />
+        </div>
+      </div>
+      <div className="form-group">
+        <label>Bewertungshinweis für die KI</label>
+        <textarea
+          value={qd.grader_info || ""}
+          onChange={(e) => onChange({ grader_info: e.target.value })}
+          placeholder="Was soll die KI bei der Zeichnung bewerten? z.B. 'Netzwerkdiagramm mit Router, Switch und drei PCs'"
           rows={3}
         />
       </div>

@@ -39,7 +39,61 @@ async def grade_answer(
     question_data: dict | None = None,
     solution: str = "",
 ) -> dict:
-    """Grade essay or shortanswer using Claude. Returns {points, correct, feedback}."""
+    """Grade essay, shortanswer or drawing using Claude. Returns {points, correct, feedback}."""
+
+    if task_type == "drawing":
+        grader_info = ""
+        if question_data and question_data.get("grader_info"):
+            grader_info = f"\nBewertungshinweis: {question_data['grader_info']}"
+
+        system_prompt = f"""Du bist ein Prüfer an einer Berufsschule.
+
+Bewerte die folgende Zeichnung/Handschrift eines Schülers.
+- Prüfe ob die Zeichnung die gestellte Aufgabe korrekt beantwortet
+- Bewerte Vollständigkeit, Korrektheit und Klarheit
+- Beschriftungen und Details sind wichtig{grader_info}
+
+Antworte als JSON:
+{{
+  "points": <0 bis {max_points}>,
+  "correct": true/false,
+  "feedback": "Begründung mit Hinweis was fehlte oder falsch war"
+}}"""
+
+        solution_text = solution or task_hint or "Keine Angabe"
+
+        # Strip data URI prefix if present
+        image_data = student_answer
+        if image_data.startswith("data:"):
+            image_data = image_data.split(",", 1)[1]
+
+        user_content = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": image_data,
+                },
+            },
+            {
+                "type": "text",
+                "text": f"Aufgabe: {task_text}\n\nMusterlösung: {solution_text}\nMaximale Punktzahl: {max_points}",
+            },
+        ]
+
+        async with _semaphore:
+            response = await asyncio.to_thread(
+                get_client().messages.create,
+                model=CLAUDE_MODEL,
+                max_tokens=CLAUDE_MAX_TOKENS,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_content}],
+            )
+
+        result = _parse_json_response(response.content[0].text)
+        result["points"] = max(0, min(max_points, result.get("points", 0)))
+        return result
 
     if task_type == "shortanswer":
         reference_answers = ""
@@ -107,7 +161,7 @@ Maximale Punktzahl: {max_points}"""
     return result
 
 
-async def generate_tasks(topic: str, count: int, difficulty: str) -> list:
+async def generate_tasks(topic: str, count: int, difficulty: str, instructions: str = "") -> list:
     """Generate exam tasks using Claude."""
 
     system_prompt = """Du bist ein erfahrener Lehrer an einer Berufsschule.
@@ -125,6 +179,7 @@ Verwende einen Mix aus diesen Fragetypen:
 - matching (Zuordnung von Paaren)
 - essay (Freitext / längere Erklärung)
 - ordering (Reihenfolge sortieren)
+- drawing (Zeichnung/Handschrift auf Canvas)
 
 Antworte als JSON-Array:
 [
@@ -134,7 +189,7 @@ Antworte als JSON-Array:
     "hint": "Optionaler Hinweis für den Schüler",
     "solution": "Ausführliche Musterlösung (wird nach der Prüfung angezeigt und zur Bewertung genutzt)",
     "topic": "{topic}",
-    "task_type": "multichoice|truefalse|shortanswer|numerical|matching|essay|ordering",
+    "task_type": "multichoice|truefalse|shortanswer|numerical|matching|essay|ordering|drawing",
     "points": 1-5,
     "question_data": {{ ... }}
   }}
@@ -147,7 +202,11 @@ question_data Struktur je nach Typ:
 - numerical: {{"answers": [{{"value": 42, "tolerance": 0.1, "fraction": 100}}]}}
 - matching: {{"shuffle": true, "pairs": [{{"question": "Begriff", "answer": "Definition"}}]}}
 - essay: {{"grader_info": "Erwartete Lösung und Bewertungskriterien"}}
-- ordering: {{"items": ["Erster Schritt", "Zweiter Schritt", "Dritter Schritt"]}}"""
+- ordering: {{"items": ["Erster Schritt", "Zweiter Schritt", "Dritter Schritt"]}}
+- drawing: {{"grader_info": "Was in der Zeichnung erwartet wird", "canvas_width": 800, "canvas_height": 400}}"""
+
+    if instructions:
+        user_message += f"\n\nZusätzliche Anweisungen des Lehrers:\n{instructions}"
 
     async with _semaphore:
         response = await asyncio.to_thread(

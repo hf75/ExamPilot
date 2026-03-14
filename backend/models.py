@@ -5,6 +5,7 @@ from datetime import datetime
 VALID_TASK_TYPES = {
     "multichoice", "truefalse", "shortanswer", "numerical",
     "matching", "ordering", "cloze", "essay", "description",
+    "drawing",
 }
 
 
@@ -81,6 +82,7 @@ class ExamCreate(BaseModel):
     class_name: Optional[str] = None
     date: Optional[str] = None
     duration_minutes: Optional[int] = None
+    password: Optional[str] = None
 
 class ExamUpdate(BaseModel):
     title: Optional[str] = None
@@ -90,6 +92,7 @@ class ExamUpdate(BaseModel):
     duration_minutes: Optional[int] = None
     status: Optional[str] = None
     show_results_immediately: Optional[bool] = None
+    password: Optional[str] = None
 
 class ExamOut(BaseModel):
     id: int
@@ -100,6 +103,7 @@ class ExamOut(BaseModel):
     duration_minutes: Optional[int] = None
     status: str
     show_results_immediately: Optional[bool] = True
+    password: Optional[str] = None
     created_at: Optional[str] = None
 
 
@@ -107,6 +111,7 @@ class ExamOut(BaseModel):
 class StudentJoinRequest(BaseModel):
     name: str
     exam_id: int
+    password: Optional[str] = None
 
 class StudentSessionOut(BaseModel):
     session_id: int

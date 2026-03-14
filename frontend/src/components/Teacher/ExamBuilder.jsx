@@ -190,6 +190,7 @@ function ExamForm({ exam, onSave, onCancel }) {
     class_name: exam?.class_name || "",
     date: exam?.date || "",
     duration_minutes: exam?.duration_minutes || "",
+    password: exam?.password || "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -206,6 +207,7 @@ function ExamForm({ exam, onSave, onCancel }) {
         duration_minutes: form.duration_minutes
           ? parseInt(form.duration_minutes)
           : null,
+        password: form.password || null,
       };
       if (isNew) {
         await api.post("/api/exams", payload);
@@ -260,6 +262,15 @@ function ExamForm({ exam, onSave, onCancel }) {
               onChange={(e) => update("duration_minutes", e.target.value)}
               placeholder="optional"
               min="1"
+            />
+          </div>
+          <div className="form-group">
+            <label>Passwort (optional)</label>
+            <input
+              type="text"
+              value={form.password}
+              onChange={(e) => update("password", e.target.value)}
+              placeholder="Zugangscode für Schüler"
             />
           </div>
         </div>

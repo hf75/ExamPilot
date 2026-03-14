@@ -151,7 +151,15 @@ export default function StudentResult() {
 
             <div className="result-student-answer">
               <strong>Antwort:</strong>
-              <pre>{answer.student_answer || "Keine Antwort"}</pre>
+              {answer.student_answer?.startsWith("data:image") ? (
+                <img
+                  src={answer.student_answer}
+                  alt="Zeichnung"
+                  style={{ maxWidth: "100%", border: "1px solid var(--border)", marginTop: 8, borderRadius: 8 }}
+                />
+              ) : (
+                <pre>{answer.student_answer || "Keine Antwort"}</pre>
+              )}
             </div>
 
             {answer.feedback && (

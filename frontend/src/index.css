@@ -933,9 +933,10 @@ a:hover {
 }
 
 .exam-view {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .exam-header-bar {
@@ -1004,6 +1005,8 @@ a:hover {
 .exam-body {
   display: flex;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Task Nav Sidebar */
@@ -1123,6 +1126,17 @@ a:hover {
   flex: 1;
   padding: 24px;
   max-width: 800px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.exam-main.exam-main-drawing {
+  max-width: none;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .task-header-exam h3 {
@@ -2187,4 +2201,166 @@ a:hover {
   border-radius: var(--radius);
   font-weight: 600;
   font-size: 0.85rem;
+}
+
+/* Drawing Canvas */
+.question-drawing {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drawing-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: var(--radius);
+}
+
+.btn-tool {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.btn-tool:hover:not(:disabled) {
+  background: var(--bg-secondary, #eee);
+}
+
+.btn-tool.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.btn-tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+
+.color-picker {
+  width: 32px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  background: none;
+}
+
+.brush-size-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.brush-size-label input[type="range"] {
+  width: 80px;
+}
+
+.drawing-canvas-wrapper {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.drawing-canvas {
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: crosshair;
+  background: white;
+  touch-action: none;
+  width: 100%;
+  height: 100%;
+}
+
+/* Drawing split layout (text left, canvas right) */
+.drawing-split-layout {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.drawing-split-left {
+  width: 28%;
+  min-width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawing-split-left .task-text-exam {
+  flex: 1;
+  margin-bottom: 12px;
+}
+
+.drawing-split-left .task-nav-buttons {
+  margin-top: auto;
+}
+
+.drawing-split-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.drawing-split-right .question-renderer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.drawing-split-right .question-drawing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.drawing-split-right .drawing-canvas-wrapper {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.drawing-split-right .drawing-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 768px) {
+  .drawing-split-layout {
+    flex-direction: column;
+    min-height: auto;
+  }
+
+  .drawing-split-left {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .drawing-split-right .drawing-canvas-wrapper {
+    min-height: 300px;
+  }
 }
