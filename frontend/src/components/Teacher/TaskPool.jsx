@@ -14,6 +14,7 @@ const TASK_TYPES = {
   essay: "Freitext",
   drawing: "Zeichnung",
   description: "Beschreibung",
+  webapp: "Web-App",
 };
 
 export default function TaskPool() {

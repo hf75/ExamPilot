@@ -39,7 +39,50 @@ async def grade_answer(
     question_data: dict | None = None,
     solution: str = "",
 ) -> dict:
-    """Grade essay, shortanswer or drawing using Claude. Returns {points, correct, feedback}."""
+    """Grade essay, shortanswer, drawing or webapp using Claude. Returns {points, correct, feedback}."""
+
+    if task_type == "webapp":
+        grader_info = ""
+        if question_data and question_data.get("grader_info"):
+            grader_info = f"\nBewertungskriterien: {question_data['grader_info']}"
+
+        system_prompt = f"""Du bist ein Prüfer an einer Berufsschule.
+
+Bewerte die Arbeit eines Schülers in einer interaktiven Web-App-Aufgabe.
+Du erhältst den exportierten Zustand (JSON) der App nach Bearbeitung durch den Schüler.
+- Prüfe ob die Aufgabe korrekt und vollständig gelöst wurde
+- Bewerte anhand der Aufgabenstellung und Bewertungskriterien
+- Berücksichtige Teilleistungen{grader_info}
+
+Antworte als JSON:
+{{
+  "points": <0 bis {max_points}>,
+  "correct": true/false,
+  "feedback": "Begründung mit Hinweis was fehlte oder falsch war"
+}}"""
+
+        solution_text = solution or "Keine Angabe"
+        user_message = f"""Aufgabe: {task_text}
+
+Musterlösung: {solution_text}
+
+Exportierter Zustand der App (JSON):
+{student_answer}
+
+Maximale Punktzahl: {max_points}"""
+
+        async with _semaphore:
+            response = await asyncio.to_thread(
+                get_client().messages.create,
+                model=CLAUDE_MODEL,
+                max_tokens=CLAUDE_MAX_TOKENS,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+            )
+
+        result = _parse_json_response(response.content[0].text)
+        result["points"] = max(0, min(max_points, result.get("points", 0)))
+        return result
 
     if task_type == "drawing":
         grader_info = ""
@@ -180,6 +223,7 @@ Verwende einen Mix aus diesen Fragetypen:
 - essay (Freitext / längere Erklärung)
 - ordering (Reihenfolge sortieren)
 - drawing (Zeichnung/Handschrift auf Canvas)
+- webapp (Interaktive Web-App, z.B. Spreadsheet, Kalkulation, Zuordnungsaufgabe — nur wenn das Thema sich dafür eignet)
 
 Antworte als JSON-Array:
 [
@@ -189,7 +233,7 @@ Antworte als JSON-Array:
     "hint": "Optionaler Hinweis für den Schüler",
     "solution": "Ausführliche Musterlösung (wird nach der Prüfung angezeigt und zur Bewertung genutzt)",
     "topic": "{topic}",
-    "task_type": "multichoice|truefalse|shortanswer|numerical|matching|essay|ordering|drawing",
+    "task_type": "multichoice|truefalse|shortanswer|numerical|matching|essay|ordering|drawing|webapp",
     "points": 1-5,
     "question_data": {{ ... }}
   }}
@@ -203,7 +247,8 @@ question_data Struktur je nach Typ:
 - matching: {{"shuffle": true, "pairs": [{{"question": "Begriff", "answer": "Definition"}}]}}
 - essay: {{"grader_info": "Erwartete Lösung und Bewertungskriterien"}}
 - ordering: {{"items": ["Erster Schritt", "Zweiter Schritt", "Dritter Schritt"]}}
-- drawing: {{"grader_info": "Was in der Zeichnung erwartet wird", "canvas_width": 800, "canvas_height": 400}}"""
+- drawing: {{"grader_info": "Was in der Zeichnung erwartet wird", "canvas_width": 800, "canvas_height": 400}}
+- webapp: {{"app_description": "Beschreibung der interaktiven App die erstellt werden soll", "grader_info": "Bewertungskriterien für den exportierten App-Zustand"}}"""
 
     if instructions:
         user_message += f"\n\nZusätzliche Anweisungen des Lehrers:\n{instructions}"
@@ -217,7 +262,27 @@ question_data Struktur je nach Typ:
             messages=[{"role": "user", "content": user_message}],
         )
 
-    return _parse_json_response(response.content[0].text)
+    tasks = _parse_json_response(response.content[0].text)
+
+    # Post-process: generate app_html for any webapp tasks
+    for task in tasks:
+        if isinstance(task, dict) and task.get("task_type") == "webapp":
+            qd = task.get("question_data", {})
+            desc = qd.get("app_description", "") or task.get("text", "")
+            grader = qd.get("grader_info", "")
+            try:
+                app_html = await generate_webapp(desc, grader)
+                if "question_data" not in task:
+                    task["question_data"] = {}
+                task["question_data"]["app_html"] = app_html
+            except Exception:
+                # If webapp generation fails, fall back to essay type
+                task["task_type"] = "essay"
+                if "question_data" not in task:
+                    task["question_data"] = {}
+                task["question_data"]["grader_info"] = grader
+
+    return tasks
 
 
 async def ai_edit_task(
@@ -230,7 +295,7 @@ async def ai_edit_task(
     system_prompt = """Du bist ein erfahrener Lehrer. Passe die gegebene Prüfungsaufgabe
 nach der Anweisung des Lehrers an. Antworte IMMER als JSON.
 
-Gültige Aufgabentypen: multichoice, truefalse, shortanswer, numerical, matching, essay, ordering, cloze, description
+Gültige Aufgabentypen: multichoice, truefalse, shortanswer, numerical, matching, essay, ordering, cloze, description, webapp
 
 question_data Struktur je nach Typ:
 - multichoice: {"single": true, "shuffle": true, "answers": [{"text": "...", "fraction": 100, "feedback": "..."}]}
@@ -241,7 +306,8 @@ question_data Struktur je nach Typ:
 - essay: {"grader_info": "..."}
 - ordering: {"items": ["Erster", "Zweiter", "Dritter"]}
 - cloze: {"gaps": [{"type": "shortanswer", "answers": [{"text": "...", "fraction": 100}]}]}
-- description: {}"""
+- description: {}
+- webapp: {"app_description": "Beschreibung der App", "grader_info": "Bewertungskriterien"}"""
 
     qdata_str = json.dumps(question_data or {}, ensure_ascii=False)
 
@@ -332,3 +398,68 @@ Bitte erkläre dem Schüler, was richtig/falsch war und wie er es besser machen 
             messages=[{"role": "user", "content": user_content}],
         )
     return response.content[0].text
+
+
+async def generate_webapp(description: str, grader_info: str = "") -> str:
+    """Generate a self-contained HTML/CSS/JS web app for an exam task."""
+
+    system_prompt = """Du bist ein erfahrener Web-Entwickler. Erstelle eine interaktive HTML-App für eine Prüfungsaufgabe an einer Berufsschule.
+
+Anforderungen:
+- Komplett eigenständiges HTML-Dokument (inline CSS + JS, KEINE externen Abhängigkeiten)
+- Modernes, sauberes Design (heller Hintergrund, abgerundete Ecken, gut lesbare Schrift)
+- Touch-freundlich (min. 44px Tap-Targets) für Tablet-Nutzung (iPad)
+- Responsive Layout das in einem iframe gut funktioniert
+- Alle nötigen Daten/Testdaten direkt in der App enthalten
+
+postMessage-Kontrakt (MUSS implementiert werden):
+1. Bei JEDER relevanten Zustandsänderung durch den Schüler:
+   window.parent.postMessage({ type: 'examPilotState', state: { /* alle relevanten Daten */ } }, '*');
+
+2. Auf State-Restore lauschen (für Auto-Save):
+   window.addEventListener('message', function(e) {
+     if (e.data && e.data.type === 'examPilotRestore') {
+       // e.data.state enthält den zuvor gespeicherten Zustand
+       // Stelle alle Eingaben/Auswahlen des Schülers wieder her
+     }
+   });
+
+Der State MUSS alle Schülereingaben enthalten die zur Bewertung nötig sind.
+Sende den initialen (leeren) State auch beim Laden der App.
+
+WICHTIG — Dies ist eine Prüfungsaufgabe! Baue KEINE der folgenden Funktionen ein:
+- Keine "Überprüfen"-, "Auswerten"- oder "Lösung anzeigen"-Buttons
+- Kein automatisches Feedback ob Eingaben richtig oder falsch sind (keine grünen/roten Markierungen, keine Fehlermeldungen bei falschen Werten)
+- Keine Hinweise auf die korrekte Lösung
+- Keine Validierung die verrät ob eine Antwort stimmt
+Die Bewertung erfolgt ausschließlich durch die KI nach Abgabe der Klassenarbeit.
+Eingabevalidierung für Formate (z.B. "nur Zahlen erlaubt") ist erlaubt, aber ohne Bewertung der inhaltlichen Korrektheit.
+
+Antworte NUR mit dem kompletten HTML-Code. Keine Erklärungen, kein Markdown, keine Code-Blöcke."""
+
+    grader_hint = ""
+    if grader_info:
+        grader_hint = f"\n\nBewertungskriterien (nicht dem Schüler zeigen, aber die App so gestalten dass diese Kriterien prüfbar sind):\n{grader_info}"
+
+    user_message = f"""Erstelle eine interaktive Web-App für folgende Prüfungsaufgabe:
+
+{description}{grader_hint}"""
+
+    async with _semaphore:
+        response = await asyncio.to_thread(
+            get_client().messages.create,
+            model=CLAUDE_MODEL,
+            max_tokens=64000,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+        )
+
+    html = response.content[0].text.strip()
+    # Strip markdown code blocks if present
+    if html.startswith("```"):
+        lines = html.split("\n")
+        lines = lines[1:]  # Remove opening ```html
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        html = "\n".join(lines)
+    return html

@@ -486,6 +486,7 @@ function TaskPreview({ task, expanded, onToggle, children }) {
     cloze: "Lückentext",
     essay: "Freitext",
     description: "Beschreibung",
+    webapp: "Web-App",
   };
 
   return (

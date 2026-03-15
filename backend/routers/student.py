@@ -121,7 +121,7 @@ async def get_session(
         t.pop("grader_info", None)
         # Strip correct-answer info from question_data for essay/shortanswer
         qd_clean = t["question_data"]
-        if t.get("task_type") in ("essay", "drawing") and isinstance(qd_clean, dict):
+        if t.get("task_type") in ("essay", "drawing", "webapp") and isinstance(qd_clean, dict):
             qd_clean.pop("grader_info", None)
         tasks.append(t)
 
@@ -233,9 +233,9 @@ async def submit_answer(
         raise HTTPException(status_code=409, detail="Aufgabe wird gerade bewertet")
 
     # Grade based on task type
-    # Drawing is AI-graded but only on explicit request (not auto-save)
-    needs_ai_grading = task_type in ("essay", "shortanswer")
-    grade_later = task_type == "drawing"  # save only, grade on navigation/submit
+    # AI-graded types: save answer now, grade only on submit to avoid locking tasks
+    needs_ai_grading = False  # no longer grade during auto-save
+    grade_later = task_type in ("essay", "shortanswer", "drawing", "webapp")
 
     if task_type == "description":
         grading_result = {"points": 0, "correct": True, "feedback": ""}
@@ -407,28 +407,28 @@ async def submit_exam(
     if session[0] != "in_progress":
         raise HTTPException(status_code=400, detail="Bereits abgegeben")
 
-    # Trigger grading for any ungraded drawing tasks
+    # Trigger AI grading for all ungraded AI-gradable tasks
     cursor = await db.execute(
         """SELECT a.id, t.*, a.student_answer FROM answers a
            JOIN tasks t ON t.id = a.task_id
-           WHERE a.session_id = ? AND t.task_type = 'drawing'
+           WHERE a.session_id = ? AND t.task_type IN ('essay', 'shortanswer', 'drawing', 'webapp')
            AND a.student_answer IS NOT NULL AND a.student_answer != ''
            AND (a.grading_status IS NULL OR a.grading_status = 'saved')""",
         (session_id,),
     )
-    ungraded_drawings = [dict(row) for row in await cursor.fetchall()]
-    if ungraded_drawings:
+    ungraded_deferred = [dict(row) for row in await cursor.fetchall()]
+    if ungraded_deferred:
         # Mark all as pending
-        for row in ungraded_drawings:
+        for row in ungraded_deferred:
             await db.execute(
                 "UPDATE answers SET grading_status = 'pending' WHERE id = ?", (row["id"],)
             )
         await db.commit()
 
-        # Grade all drawings and wait for completion before calculating points
+        # Grade all and wait for completion before calculating points
         grading_tasks = [
             _grade_in_background(row["id"], row, row["student_answer"])
-            for row in ungraded_drawings
+            for row in ungraded_deferred
         ]
         await asyncio.gather(*grading_tasks, return_exceptions=True)
 
@@ -513,13 +513,25 @@ async def get_results(
         raise HTTPException(status_code=400, detail="Klassenarbeit noch nicht abgegeben")
 
     cursor = await db.execute(
-        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points, t.solution
+        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points,
+                  t.solution, t.task_type, t.question_data
            FROM answers a
            JOIN tasks t ON t.id = a.task_id
            WHERE a.session_id = ?""",
         (session_id,),
     )
-    answers = [dict(row) for row in await cursor.fetchall()]
+    answers = []
+    for row in await cursor.fetchall():
+        a = dict(row)
+        # Parse question_data and expose app_html for webapp tasks
+        if a.get("task_type") == "webapp" and a.get("question_data"):
+            try:
+                qd = json.loads(a["question_data"]) if isinstance(a["question_data"], str) else a["question_data"]
+                a["app_html"] = qd.get("app_html", "")
+            except (json.JSONDecodeError, TypeError):
+                a["app_html"] = ""
+        a.pop("question_data", None)
+        answers.append(a)
 
     from services.grading import calculate_grade
     total = session_dict["total_points"] or 0

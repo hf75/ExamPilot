@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import QuestionRenderer from "../Questions/QuestionRenderer";
 import TaskNav from "../Student/TaskNav";
+import Markdown from "../Markdown";
 
 export default function ExamPreview() {
   const { examId } = useParams();
@@ -96,8 +97,53 @@ export default function ExamPreview() {
           onSelect={setCurrentTaskIndex}
         />
 
-        <div className="exam-main">
-          {currentTask && (
+        <div className={`exam-main ${currentTask?.task_type === "drawing" || currentTask?.task_type === "webapp" ? "exam-main-drawing" : ""}`}>
+          {currentTask && (currentTask.task_type === "drawing" || currentTask.task_type === "webapp") ? (
+            <div className="drawing-split-layout">
+              <div className="drawing-split-left">
+                <div className="task-header-exam">
+                  <h3>
+                    {currentTask.title}{" "}
+                    <span className="task-points-badge">
+                      {currentTask.points} Pkt.
+                    </span>
+                  </h3>
+                </div>
+                <div className="task-text-exam"><Markdown>{currentTask.text}</Markdown></div>
+
+                <div className="task-nav-buttons">
+                  <button
+                    className="btn-secondary"
+                    onClick={() =>
+                      setCurrentTaskIndex(Math.max(0, currentTaskIndex - 1))
+                    }
+                    disabled={currentTaskIndex === 0}
+                  >
+                    &larr; Vorherige
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    onClick={() =>
+                      setCurrentTaskIndex(
+                        Math.min(tasks.length - 1, currentTaskIndex + 1)
+                      )
+                    }
+                    disabled={currentTaskIndex === tasks.length - 1}
+                  >
+                    Nächste &rarr;
+                  </button>
+                </div>
+              </div>
+              <div className="drawing-split-right">
+                <QuestionRenderer
+                  task={currentTask}
+                  answer={answers[currentTask.id] || ""}
+                  onChange={(value) => handleAnswerChange(currentTask.id, value)}
+                  disabled={false}
+                />
+              </div>
+            </div>
+          ) : currentTask ? (
             <>
               <div className="task-header-exam">
                 <h3>
@@ -110,7 +156,7 @@ export default function ExamPreview() {
                 </h3>
               </div>
               {currentTask.task_type !== "cloze" && (
-                <div className="task-text-exam">{currentTask.text}</div>
+                <div className="task-text-exam"><Markdown>{currentTask.text}</Markdown></div>
               )}
 
               <QuestionRenderer
@@ -143,7 +189,7 @@ export default function ExamPreview() {
                 </button>
               </div>
             </>
-          )}
+          ) : null}
 
           {tasks.length === 0 && (
             <div className="empty-state">

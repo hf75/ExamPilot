@@ -49,6 +49,7 @@ Verwende passende Aufgabentypen:
 - ordering: Reihenfolge (question_data: {"items": ["Erster", "Zweiter", "Dritter"]})
 - cloze: Lückentext (question_data: {"gaps": [{"type": "shortanswer", "answers": [{"text": "...", "fraction": 100}]}]})
 - essay: Freitext (question_data: {"grader_info": "Erwartete Lösung und Kriterien"})
+- webapp: Interaktive Web-App (question_data: {"app_description": "Beschreibung der App", "grader_info": "Bewertungskriterien"}) — nur wenn das Thema sich für eine interaktive Anwendung eignet (z.B. Kalkulationen, Zuordnungen, Spreadsheets)
 - description: Nur Beschreibung/Info (question_data: {})
 
 Wähle den Aufgabentyp basierend auf dem Inhalt:
@@ -83,6 +84,36 @@ WICHTIG: Jede Aufgabe MUSS eine ausführliche "solution" (Musterlösung) enthalt
 
 SYSTEM_PROMPT = """Du bist ein erfahrener Lehrer. Analysiere das hochgeladene Dokument und erstelle daraus strukturierte Prüfungsaufgaben in verschiedenen Formaten.
 Antworte IMMER als valides JSON-Array. Keine zusätzliche Erklärung."""
+
+
+async def _post_process_tasks(tasks: list) -> None:
+    """Validate tasks and generate app_html for any webapp tasks."""
+    from services.claude_service import generate_webapp
+
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        task.setdefault("title", "Unbenannte Aufgabe")
+        task.setdefault("text", "")
+        task.setdefault("hint", "")
+        task.setdefault("solution", "")
+        task.setdefault("topic", "")
+        task.setdefault("task_type", "essay")
+        task.setdefault("points", 1)
+        task.setdefault("question_data", {})
+
+        # Generate app_html for webapp tasks
+        if task["task_type"] == "webapp":
+            qd = task["question_data"]
+            desc = qd.get("app_description", "") or task.get("text", "")
+            grader = qd.get("grader_info", "")
+            try:
+                app_html = await generate_webapp(desc, grader)
+                qd["app_html"] = app_html
+            except Exception:
+                # Fallback to essay if webapp generation fails
+                task["task_type"] = "essay"
+                qd["grader_info"] = grader
 
 
 def _extract_docx(file_path: str) -> list[dict]:
@@ -212,18 +243,8 @@ async def import_document(file_path: str, original_filename: str) -> list[dict]:
 
     tasks = _parse_json_response(response.content[0].text)
 
-    # Validate
-    for task in tasks:
-        if not isinstance(task, dict):
-            continue
-        task.setdefault("title", "Unbenannte Aufgabe")
-        task.setdefault("text", "")
-        task.setdefault("hint", "")
-        task.setdefault("solution", "")
-        task.setdefault("topic", "")
-        task.setdefault("task_type", "essay")
-        task.setdefault("points", 1)
-        task.setdefault("question_data", {})
+    # Validate and post-process
+    await _post_process_tasks(tasks)
 
     return tasks
 
@@ -263,16 +284,7 @@ async def import_document_with_instructions(
 
     tasks = _parse_json_response(response.content[0].text)
 
-    for task in tasks:
-        if not isinstance(task, dict):
-            continue
-        task.setdefault("title", "Unbenannte Aufgabe")
-        task.setdefault("text", "")
-        task.setdefault("hint", "")
-        task.setdefault("solution", "")
-        task.setdefault("topic", "")
-        task.setdefault("task_type", "essay")
-        task.setdefault("points", 1)
-        task.setdefault("question_data", {})
+    # Validate and post-process
+    await _post_process_tasks(tasks)
 
     return tasks

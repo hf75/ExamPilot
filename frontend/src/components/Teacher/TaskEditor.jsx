@@ -12,6 +12,7 @@ const TASK_TYPES = {
   cloze: "Lückentext",
   ordering: "Reihenfolge",
   description: "Beschreibung",
+  webapp: "Web-App",
 };
 
 function getDefaultQuestionData(type) {
@@ -37,6 +38,8 @@ function getDefaultQuestionData(type) {
       return { grader_info: "", canvas_width: 1600, canvas_height: 800 };
     case "cloze":
       return { gaps: [] };
+    case "webapp":
+      return { app_html: "", grader_info: "", app_description: "" };
     case "description":
       return {};
     default:
@@ -211,6 +214,9 @@ export default function TaskEditor({ task, poolId, onSave, onCancel }) {
           )}
           {form.task_type === "cloze" && (
             <ClozeConfig qd={qd} onChange={updateQD} />
+          )}
+          {form.task_type === "webapp" && (
+            <WebAppConfig qd={qd} onChange={updateQD} />
           )}
         </div>
 
@@ -599,6 +605,88 @@ function DrawingConfig({ qd, onChange }) {
           rows={3}
         />
       </div>
+    </div>
+  );
+}
+
+function WebAppConfig({ qd, onChange }) {
+  const [generating, setGenerating] = useState(false);
+  const [desc, setDesc] = useState(qd.app_description || "");
+
+  async function handleGenerate() {
+    if (!desc.trim()) return alert("Bitte eine Beschreibung eingeben.");
+    setGenerating(true);
+    try {
+      const result = await api.post("/api/tasks/generate-webapp", {
+        description: desc,
+        grader_info: qd.grader_info || "",
+      });
+      onChange({ app_html: result.app_html, app_description: desc });
+    } catch (err) {
+      alert("Fehler: " + err.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  const configFields = (
+    <>
+      <div className="form-group">
+        <label>App-Beschreibung (was soll die App können?)</label>
+        <textarea
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          placeholder='z.B. "ABC-Analyse mit 10 Artikeln. Schüler sollen Artikel nach Umsatzanteil sortieren und in A/B/C-Kategorien einteilen. Tabelle mit Artikelname, Menge, Einzelpreis. Schüler berechnen Umsatz, kumulierten Anteil und ordnen Klassen zu."'
+          rows={4}
+        />
+      </div>
+      <div className="form-group">
+        <label>Bewertungskriterien für die KI</label>
+        <textarea
+          value={qd.grader_info || ""}
+          onChange={(e) => onChange({ grader_info: e.target.value })}
+          placeholder="Wann ist die Aufgabe korrekt gelöst? z.B. 'A-Artikel machen ~80% des Umsatzes aus, B ~15%, C ~5%'"
+          rows={3}
+        />
+      </div>
+      <div className="task-actions">
+        <button
+          className="btn-primary-sm"
+          onClick={handleGenerate}
+          disabled={generating}
+        >
+          {generating ? "App wird generiert..." : qd.app_html ? "App neu generieren" : "App generieren"}
+        </button>
+      </div>
+    </>
+  );
+
+  if (qd.app_html) {
+    return (
+      <div className="qd-section">
+        <h4>Web-App Konfiguration</h4>
+        <div className="webapp-editor-split">
+          <div className="webapp-editor-left">
+            {configFields}
+          </div>
+          <div className="webapp-editor-right">
+            <label className="webapp-preview-label">Vorschau:</label>
+            <iframe
+              srcDoc={qd.app_html}
+              sandbox="allow-scripts"
+              title="Web-App Vorschau"
+              className="webapp-iframe webapp-preview-iframe"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="qd-section">
+      <h4>Web-App Konfiguration</h4>
+      {configFields}
     </div>
   );
 }

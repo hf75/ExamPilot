@@ -8,6 +8,7 @@ import Cloze from "./Cloze";
 import Ordering from "./Ordering";
 import Description from "./Description";
 import Drawing from "./Drawing";
+import WebApp from "./WebApp";
 
 const COMPONENTS = {
   multichoice: MultiChoice,
@@ -20,6 +21,7 @@ const COMPONENTS = {
   ordering: Ordering,
   description: Description,
   drawing: Drawing,
+  webapp: WebApp,
 };
 
 export default function QuestionRenderer({ task, answer, onChange, disabled }) {

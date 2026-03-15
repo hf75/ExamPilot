@@ -80,13 +80,25 @@ async def get_student_result(
     session = dict(session)
 
     cursor = await db.execute(
-        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points, t.hint, t.solution
+        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points,
+                  t.hint, t.solution, t.task_type, t.question_data
            FROM answers a
            JOIN tasks t ON t.id = a.task_id
            WHERE a.session_id = ?""",
         (session_id,),
     )
-    answers = [dict(row) for row in await cursor.fetchall()]
+    answers = []
+    for row in await cursor.fetchall():
+        a = dict(row)
+        if a.get("task_type") == "webapp" and a.get("question_data"):
+            try:
+                import json
+                qd = json.loads(a["question_data"]) if isinstance(a["question_data"], str) else a["question_data"]
+                a["app_html"] = qd.get("app_html", "")
+            except Exception:
+                a["app_html"] = ""
+        a.pop("question_data", None)
+        answers.append(a)
 
     grade, label, percent = calculate_grade(
         session.get("total_points", 0) or 0,

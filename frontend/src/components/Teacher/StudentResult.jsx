@@ -152,7 +152,25 @@ export default function StudentResult() {
 
             <div className="result-student-answer">
               <strong>Antwort:</strong>
-              {answer.student_answer?.startsWith("data:image") ? (
+              {answer.task_type === "webapp" && answer.app_html ? (
+                <div className="webapp-result" style={{ marginTop: 8 }}>
+                  <div className="webapp-iframe-container">
+                    <div className="webapp-overlay" />
+                    <iframe
+                      srcDoc={answer.app_html}
+                      sandbox="allow-scripts"
+                      title="Web-App Ergebnis"
+                      className="webapp-iframe"
+                      onLoad={(e) => {
+                        try {
+                          const state = JSON.parse(answer.student_answer);
+                          e.target.contentWindow.postMessage({ type: "examPilotRestore", state }, "*");
+                        } catch {}
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : answer.student_answer?.startsWith("data:image") ? (
                 <img
                   src={answer.student_answer}
                   alt="Zeichnung"

@@ -10,7 +10,7 @@ import aiosqlite
 from database import get_db
 from models import TaskCreate, TaskUpdate, TaskOut
 from routers.auth import require_teacher
-from services.claude_service import generate_tasks as ai_generate_tasks, ai_edit_task
+from services.claude_service import generate_tasks as ai_generate_tasks, ai_edit_task, generate_webapp
 
 
 class GenerateRequest(BaseModel):
@@ -18,6 +18,11 @@ class GenerateRequest(BaseModel):
     count: int = 5
     difficulty: str = "mittel"
     instructions: str = ""
+
+
+class GenerateWebAppRequest(BaseModel):
+    description: str
+    grader_info: str = ""
 
 
 class AiEditRequest(BaseModel):
@@ -155,6 +160,18 @@ async def generate_tasks_endpoint(
         raise HTTPException(status_code=500, detail=f"KI-Generierung fehlgeschlagen: {str(e)}")
 
 
+@router.post("/generate-webapp")
+async def generate_webapp_endpoint(
+    req: GenerateWebAppRequest,
+    _: bool = Depends(require_teacher),
+):
+    try:
+        app_html = await generate_webapp(req.description, req.grader_info)
+        return {"app_html": app_html}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Web-App-Generierung fehlgeschlagen: {str(e)}")
+
+
 @router.post("/{task_id}/ai-edit")
 async def ai_edit_task_endpoint(
     task_id: int,
@@ -177,6 +194,20 @@ async def ai_edit_task_endpoint(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"KI-Bearbeitung fehlgeschlagen: {str(e)}")
+
+    # If AI changed task to webapp, generate the app_html
+    if updated.get("task_type") == "webapp":
+        qd = updated.get("question_data", {})
+        if not qd.get("app_html"):
+            desc = qd.get("app_description", "") or updated.get("text", task["text"])
+            grader = qd.get("grader_info", "")
+            try:
+                app_html = await generate_webapp(desc, grader)
+                qd["app_html"] = app_html
+                updated["question_data"] = qd
+            except Exception:
+                # Fallback to essay
+                updated["task_type"] = "essay"
 
     # Apply changes
     qdata_json = json.dumps(updated.get("question_data", task.get("question_data", {})), ensure_ascii=False)

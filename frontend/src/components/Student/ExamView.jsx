@@ -15,9 +15,7 @@ export default function ExamView() {
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
-  const [gradingTasks, setGradingTasks] = useState(new Set());
   const autoSaveTimer = useRef(null);
-  const gradingPollTimer = useRef(null);
 
   useEffect(() => {
     loadSession();
@@ -81,84 +79,40 @@ export default function ExamView() {
     }
   }
 
-  // Poll grading status while any task is pending
-  useEffect(() => {
-    if (gradingTasks.size === 0) return;
-
-    async function pollStatus() {
-      try {
-        const statuses = await api.get(`/api/student/grading-status/${sessionId}`);
-        const stillPending = new Set();
-        for (const [taskId, status] of Object.entries(statuses)) {
-          if (status === "pending") {
-            stillPending.add(parseInt(taskId));
-          }
-        }
-        setGradingTasks(stillPending);
-      } catch {
-        // ignore polling errors
-      }
-    }
-
-    gradingPollTimer.current = setInterval(pollStatus, 2000);
-    return () => clearInterval(gradingPollTimer.current);
-  }, [gradingTasks.size, sessionId]);
-
-  // Auto-save answer (debounced)
+  // Auto-save answer (debounced) — saves only, no grading during exam
   const autoSave = useCallback(
     async (taskId, answer) => {
       try {
-        const result = await api.post("/api/student/answer", {
+        await api.post("/api/student/answer", {
           session_id: parseInt(sessionId),
           task_id: taskId,
           student_answer: answer,
         });
-        if (result.grading_status === "pending") {
-          setGradingTasks((prev) => new Set([...prev, taskId]));
-        }
-      } catch (err) {
-        if (err.status === 409) {
-          // Task is being graded, ignore
-        }
-      }
-    },
-    [sessionId]
-  );
-
-  // Trigger drawing grading when navigating away from a drawing task
-  const triggerDrawingGrade = useCallback(
-    async (taskId, answer) => {
-      if (!answer || !answer.startsWith("data:image")) return;
-      try {
-        const result = await api.post("/api/student/grade-drawing", {
-          session_id: parseInt(sessionId),
-          task_id: taskId,
-          student_answer: answer,
-        });
-        if (result.grading_status === "pending") {
-          setGradingTasks((prev) => new Set([...prev, taskId]));
-        }
       } catch {
-        // ignore
+        // ignore save errors
       }
     },
     [sessionId]
   );
 
   function handleNavigate(newIndex) {
-    // If leaving a drawing task, save immediately then trigger grading
     const currentT = tasks[currentTaskIndex];
-    if (currentT?.task_type === "drawing" && answers[currentT.id]) {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      autoSave(currentT.id, answers[currentT.id]).then(() => {
-        triggerDrawingGrade(currentT.id, answers[currentT.id]);
-      });
+
+    // Cancel any pending debounce timer — we save immediately on navigate
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
     }
+
+    // Flush pending answer for current task
+    if (currentT && answers[currentT.id]) {
+      autoSave(currentT.id, answers[currentT.id]);
+    }
+
     setCurrentTaskIndex(newIndex);
   }
 
   function handleAnswerChange(taskId, value) {
-    if (gradingTasks.has(taskId)) return; // locked while grading
     setAnswers((prev) => ({ ...prev, [taskId]: value }));
 
     // Debounced auto-save
@@ -172,9 +126,8 @@ export default function ExamView() {
       // Cancel any pending auto-save timer
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
-      // Save all answers that are not currently being graded
+      // Save all pending answers
       const savePromises = Object.entries(answers)
-        .filter(([taskId]) => !gradingTasks.has(parseInt(taskId)))
         .map(([taskId, answer]) =>
           api.post("/api/student/answer", {
             session_id: parseInt(sessionId),
@@ -184,16 +137,7 @@ export default function ExamView() {
         );
       await Promise.all(savePromises);
 
-      // Wait for any pending AI grading to finish (poll up to 30s)
-      if (gradingTasks.size > 0) {
-        for (let i = 0; i < 15; i++) {
-          await new Promise((r) => setTimeout(r, 2000));
-          const statuses = await api.get(`/api/student/grading-status/${sessionId}`);
-          const stillPending = Object.values(statuses).some((s) => s === "pending");
-          if (!stillPending) break;
-        }
-      }
-
+      // Submit — backend grades all AI tasks and calculates points
       await api.post(`/api/student/submit/${sessionId}`);
       navigate(`/results/${sessionId}`);
     } catch (err) {
@@ -267,12 +211,11 @@ export default function ExamView() {
           tasks={tasks}
           currentIndex={currentTaskIndex}
           answers={answers}
-          gradingTasks={gradingTasks}
           onSelect={handleNavigate}
         />
 
-        <div className={`exam-main ${currentTask?.task_type === "drawing" ? "exam-main-drawing" : ""}`}>
-          {currentTask && currentTask.task_type === "drawing" ? (
+        <div className={`exam-main ${currentTask?.task_type === "drawing" || currentTask?.task_type === "webapp" ? "exam-main-drawing" : ""}`}>
+          {currentTask && (currentTask.task_type === "drawing" || currentTask.task_type === "webapp") ? (
                 <div className="drawing-split-layout">
                   <div className="drawing-split-left">
                     <div className="task-header-exam">
@@ -284,13 +227,6 @@ export default function ExamView() {
                       </h3>
                     </div>
                     <div className="task-text-exam"><Markdown>{currentTask.text}</Markdown></div>
-
-                    {gradingTasks.has(currentTask.id) && (
-                      <div className="grading-lock-banner">
-                        <span className="grading-spinner"></span>
-                        Antwort wird bewertet — bitte warten...
-                      </div>
-                    )}
 
                     <div className="task-nav-buttons">
                       <button
@@ -320,7 +256,7 @@ export default function ExamView() {
                       task={currentTask}
                       answer={answers[currentTask.id] || ""}
                       onChange={(value) => handleAnswerChange(currentTask.id, value)}
-                      disabled={gradingTasks.has(currentTask.id)}
+                      disabled={false}
                     />
                   </div>
                 </div>
@@ -340,18 +276,11 @@ export default function ExamView() {
                     <div className="task-text-exam"><Markdown>{currentTask.text}</Markdown></div>
                   )}
 
-                  {gradingTasks.has(currentTask.id) && (
-                    <div className="grading-lock-banner">
-                      <span className="grading-spinner"></span>
-                      Antwort wird bewertet — bitte warten...
-                    </div>
-                  )}
-
                   <QuestionRenderer
                     task={currentTask}
                     answer={answers[currentTask.id] || ""}
                     onChange={(value) => handleAnswerChange(currentTask.id, value)}
-                    disabled={gradingTasks.has(currentTask.id)}
+                    disabled={false}
                   />
 
                   <div className="task-nav-buttons">
