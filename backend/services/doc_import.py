@@ -86,6 +86,7 @@ _DOC_TYPE_DESCRIPTIONS = {
     "essay": 'essay: Freitext (question_data: {"grader_info": "Erwartete Lösung und Kriterien"})',
     "webapp": 'webapp: Interaktive Web-App (question_data: {"app_description": "Beschreibung der App", "grader_info": "Bewertungskriterien"}) — nur wenn das Thema sich dafür eignet',
     "feynman": 'feynman: Erkläraufgabe — Schüler erklärt ein Konzept einem unwissenden KI-Kollegen im Chat (question_data: {"concept": "...", "context": "...", "max_turns": 10, "grader_info": "..."})',
+    "scenario": 'scenario: Branching-Szenario — Schüler navigiert durch interaktive Entscheidungssituationen (question_data: {"scenario_description": "...", "context": "...", "max_decisions": 5, "grader_info": "..."})',
     "description": 'description: Nur Beschreibung/Info (question_data: {})',
 }
 

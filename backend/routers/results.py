@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+import json
 import aiosqlite
 
 from database import get_db
 from models import AnswerAdjust
 from routers.auth import require_teacher
 from services.grading import calculate_grade
+from services.claude_service import analyze_class_weaknesses
 
 router = APIRouter(prefix="/api/exams", tags=["results"])
 
@@ -212,3 +214,106 @@ async def adjust_answer(
 
     await db.commit()
     return {"message": "Punkte angepasst", "new_total": total}
+
+
+@router.post("/{exam_id}/class-analysis")
+async def get_class_analysis(
+    exam_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    # Check cache first
+    cursor = await db.execute(
+        "SELECT analysis_text FROM class_analyses WHERE exam_id = ?", (exam_id,)
+    )
+    cached = await cursor.fetchone()
+    if cached:
+        return {"analysis": cached[0], "cached": True}
+
+    # Collect all answers for submitted sessions
+    cursor = await db.execute(
+        """SELECT t.id as task_id, t.title, t.text, t.task_type, t.solution,
+                  t.points as max_points, a.student_answer, a.points_awarded
+           FROM exam_tasks et
+           JOIN tasks t ON t.id = et.task_id
+           JOIN answers a ON a.task_id = t.id
+           JOIN exam_sessions es ON es.id = a.session_id AND es.exam_id = ?
+           WHERE es.status = 'submitted'
+           ORDER BY et.position, a.points_awarded ASC""",
+        (exam_id,),
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="Keine abgegebenen Arbeiten vorhanden")
+
+    # Group by task and compute stats
+    from collections import defaultdict
+    task_groups = defaultdict(lambda: {"answers": []})
+    task_order = []
+    for r in rows:
+        tid = r["task_id"]
+        if tid not in task_groups:
+            task_order.append(tid)
+        g = task_groups[tid]
+        g["title"] = r["title"]
+        g["text"] = r["text"]
+        g["task_type"] = r["task_type"]
+        g["solution"] = r["solution"] or ""
+        g["max_points"] = r["max_points"]
+        g["answers"].append({
+            "student_answer": r["student_answer"] or "",
+            "points_awarded": r["points_awarded"] or 0,
+        })
+
+    skip_answers_types = {"feynman", "scenario", "drawing", "webapp"}
+    tasks_with_stats = []
+    for tid in task_order:
+        g = task_groups[tid]
+        answers = g["answers"]
+        n = len(answers)
+        avg = sum(a["points_awarded"] for a in answers) / n if n else 0
+        success = sum(1 for a in answers if a["points_awarded"] >= g["max_points"] * 0.5) / n if n else 0
+
+        wrong_answers = []
+        if g["task_type"] not in skip_answers_types:
+            wrong = [a for a in answers if a["points_awarded"] < g["max_points"]]
+            for a in wrong[:10]:
+                wrong_answers.append({
+                    "points": a["points_awarded"],
+                    "answer": a["student_answer"][:300],
+                })
+
+        tasks_with_stats.append({
+            "title": g["title"],
+            "text": g["text"],
+            "task_type": g["task_type"],
+            "solution": g["solution"],
+            "max_points": g["max_points"],
+            "avg_points": avg,
+            "success_rate": success,
+            "student_count": n,
+            "wrong_answers": wrong_answers,
+        })
+
+    analysis = await analyze_class_weaknesses(tasks_with_stats)
+
+    # Cache result
+    await db.execute(
+        "INSERT OR REPLACE INTO class_analyses (exam_id, analysis_text) VALUES (?, ?)",
+        (exam_id, analysis),
+    )
+    await db.commit()
+
+    return {"analysis": analysis, "cached": False}
+
+
+@router.delete("/{exam_id}/class-analysis")
+async def delete_class_analysis(
+    exam_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    await db.execute("DELETE FROM class_analyses WHERE exam_id = ?", (exam_id,))
+    await db.commit()
+    return {"message": "Analyse gelöscht"}

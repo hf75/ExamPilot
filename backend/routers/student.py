@@ -6,8 +6,8 @@ import aiosqlite
 from database import get_db
 from config import DB_PATH
 from datetime import datetime
-from models import StudentJoinRequest, AnswerSubmit, AnswerDispute, HeartbeatRequest, ExplainRequest, FeynmanChatRequest
-from services.claude_service import grade_answer, explain_answer, feynman_respond
+from models import StudentJoinRequest, AnswerSubmit, AnswerDispute, HeartbeatRequest, ExplainRequest, FeynmanChatRequest, ScenarioNextRequest
+from services.claude_service import grade_answer, explain_answer, feynman_respond, scenario_respond
 from services.auto_grader import is_auto_gradable, grade_auto
 from routers.websocket import broadcast
 
@@ -121,7 +121,7 @@ async def get_session(
         t.pop("grader_info", None)
         # Strip correct-answer info from question_data for essay/shortanswer
         qd_clean = t["question_data"]
-        if t.get("task_type") in ("essay", "drawing", "webapp", "feynman") and isinstance(qd_clean, dict):
+        if t.get("task_type") in ("essay", "drawing", "webapp", "feynman", "scenario") and isinstance(qd_clean, dict):
             qd_clean.pop("grader_info", None)
         tasks.append(t)
 
@@ -235,7 +235,7 @@ async def submit_answer(
     # Grade based on task type
     # AI-graded types: save answer now, grade only on submit to avoid locking tasks
     needs_ai_grading = False  # no longer grade during auto-save
-    grade_later = task_type in ("essay", "shortanswer", "drawing", "webapp", "feynman")
+    grade_later = task_type in ("essay", "shortanswer", "drawing", "webapp", "feynman", "scenario")
 
     if task_type == "description":
         grading_result = {"points": 0, "correct": True, "feedback": ""}
@@ -444,6 +444,55 @@ async def feynman_chat(req: FeynmanChatRequest, db: aiosqlite.Connection = Depen
     return {"response": response}
 
 
+@router.post("/scenario-next")
+async def scenario_next(req: ScenarioNextRequest, db: aiosqlite.Connection = Depends(get_db)):
+    """Get next situation in a branching scenario."""
+    # Verify session is in_progress
+    cursor = await db.execute(
+        "SELECT status FROM exam_sessions WHERE id = ?", (req.session_id,)
+    )
+    session = await cursor.fetchone()
+    if not session or session[0] != "in_progress":
+        raise HTTPException(status_code=400, detail="Sitzung nicht aktiv")
+
+    # Load task
+    cursor = await db.execute("SELECT * FROM tasks WHERE id = ?", (req.task_id,))
+    task_row = await cursor.fetchone()
+    if not task_row:
+        raise HTTPException(status_code=404, detail="Aufgabe nicht gefunden")
+    task = dict(task_row)
+
+    if task["task_type"] != "scenario":
+        raise HTTPException(status_code=400, detail="Keine Szenario-Aufgabe")
+
+    qd = task.get("question_data", "{}")
+    try:
+        question_data = json.loads(qd) if isinstance(qd, str) else (qd or {})
+    except (json.JSONDecodeError, TypeError):
+        question_data = {}
+
+    scenario_description = question_data.get("scenario_description", "")
+    context = question_data.get("context", "")
+    max_decisions = question_data.get("max_decisions", 5)
+
+    # Count decisions made
+    decisions_made = len([e for e in req.transcript if e.get("role") == "decision"])
+    if decisions_made > max_decisions:
+        raise HTTPException(status_code=400, detail="Maximale Entscheidungen erreicht")
+
+    is_last_decision = decisions_made >= max_decisions - 1
+
+    result = await scenario_respond(
+        scenario_description=scenario_description,
+        context=context,
+        task_text=task["text"],
+        transcript=req.transcript,
+        is_last_decision=is_last_decision,
+    )
+
+    return result
+
+
 @router.post("/submit/{session_id}")
 async def submit_exam(
     session_id: int, db: aiosqlite.Connection = Depends(get_db)
@@ -461,7 +510,7 @@ async def submit_exam(
     cursor = await db.execute(
         """SELECT a.id, t.*, a.student_answer FROM answers a
            JOIN tasks t ON t.id = a.task_id
-           WHERE a.session_id = ? AND t.task_type IN ('essay', 'shortanswer', 'drawing', 'webapp', 'feynman')
+           WHERE a.session_id = ? AND t.task_type IN ('essay', 'shortanswer', 'drawing', 'webapp', 'feynman', 'scenario')
            AND a.student_answer IS NOT NULL AND a.student_answer != ''
            AND (a.grading_status IS NULL OR a.grading_status = 'saved')""",
         (session_id,),

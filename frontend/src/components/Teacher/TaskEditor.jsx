@@ -14,6 +14,7 @@ const TASK_TYPES = {
   description: "Beschreibung",
   webapp: "Web-App",
   feynman: "Feynman-Erklärung",
+  scenario: "Branching-Szenario",
 };
 
 function getDefaultQuestionData(type) {
@@ -43,6 +44,8 @@ function getDefaultQuestionData(type) {
       return { app_html: "", grader_info: "", app_description: "" };
     case "feynman":
       return { concept: "", context: "", max_turns: 10, grader_info: "" };
+    case "scenario":
+      return { scenario_description: "", context: "", max_decisions: 5, grader_info: "" };
     case "description":
       return {};
     default:
@@ -223,6 +226,9 @@ export default function TaskEditor({ task, poolId, onSave, onCancel }) {
           )}
           {form.task_type === "feynman" && (
             <FeynmanConfig qd={qd} onChange={updateQD} />
+          )}
+          {form.task_type === "scenario" && (
+            <ScenarioConfig qd={qd} onChange={updateQD} />
           )}
         </div>
 
@@ -822,6 +828,51 @@ function FeynmanConfig({ qd, onChange }) {
           value={qd.grader_info || ""}
           onChange={(e) => onChange({ grader_info: e.target.value })}
           placeholder="z.B. Schüler soll alle 7 Schichten des OSI-Modells nennen und ihre Funktion erklären können"
+          rows={3}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ScenarioConfig({ qd, onChange }) {
+  return (
+    <div className="qd-section">
+      <h4>Branching-Szenario Konfiguration</h4>
+      <div className="form-group">
+        <label>Ausgangsszenario (Beschreibung der Ausgangssituation)</label>
+        <textarea
+          value={qd.scenario_description || ""}
+          onChange={(e) => onChange({ scenario_description: e.target.value })}
+          placeholder="z.B. Du bist neuer Mitarbeiter in der Einkaufsabteilung. Ein wichtiger Lieferant meldet Lieferschwierigkeiten bei einem Schlüsselprodukt..."
+          rows={4}
+        />
+      </div>
+      <div className="form-group">
+        <label>Kontext / Fachgebiet</label>
+        <input
+          type="text"
+          value={qd.context || ""}
+          onChange={(e) => onChange({ context: e.target.value })}
+          placeholder="z.B. BWL - Beschaffung, Vertragsrecht, Wirtschaftspolitik"
+        />
+      </div>
+      <div className="form-group">
+        <label>Maximale Entscheidungen ({qd.max_decisions || 5})</label>
+        <input
+          type="range"
+          min="2"
+          max="10"
+          value={qd.max_decisions || 5}
+          onChange={(e) => onChange({ max_decisions: parseInt(e.target.value) || 5 })}
+        />
+      </div>
+      <div className="form-group">
+        <label>Bewertungskriterien für die KI</label>
+        <textarea
+          value={qd.grader_info || ""}
+          onChange={(e) => onChange({ grader_info: e.target.value })}
+          placeholder="z.B. Schüler soll wirtschaftliche Konsequenzen abwägen, Vertragsrecht beachten und eine nachhaltige Lösung finden"
           rows={3}
         />
       </div>

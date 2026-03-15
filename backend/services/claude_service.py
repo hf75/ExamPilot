@@ -129,6 +129,57 @@ Maximale Punktzahl: {max_points}"""
         result["points"] = max(0, min(max_points, result.get("points", 0)))
         return result
 
+    if task_type == "scenario":
+        grader_info = ""
+        if question_data and question_data.get("grader_info"):
+            grader_info = f"\nBewertungskriterien des Lehrers: {question_data['grader_info']}"
+
+        scenario_desc = (question_data or {}).get("scenario_description", "")
+        context = (question_data or {}).get("context", "")
+
+        system_prompt = f"""Du bist ein Prüfer an einer Berufsschule.
+Schreibe das Feedback in direkter Ansprache ("Du hast...", "Dir fehlt..."), nicht in dritter Person.
+
+Bewerte den folgenden Entscheidungspfad in einem Branching-Szenario.
+Szenario: {scenario_desc}
+{f"Kontext/Fachgebiet: {context}" if context else ""}
+
+Bewerte:
+- Wurden fachlich fundierte Entscheidungen getroffen?
+- Wurden Konsequenzen richtig eingeschätzt?
+- Zeigt der Entscheidungspfad Verständnis der relevanten Konzepte?
+- Wurden offensichtlich schlechte Optionen vermieden?{grader_info}
+
+Antworte als JSON:
+{{
+  "points": <0 bis {max_points}>,
+  "correct": true/false,
+  "feedback": "Begründung in Du-Form mit Hinweis was gut war und was besser wäre"
+}}"""
+
+        solution_text = solution or "Keine Angabe"
+        user_message = f"""Aufgabe: {task_text}
+
+Musterlösung: {solution_text}
+
+Entscheidungsprotokoll:
+{student_answer}
+
+Maximale Punktzahl: {max_points}"""
+
+        async with _semaphore:
+            response = await asyncio.to_thread(
+                get_client().messages.create,
+                model=CLAUDE_MODEL,
+                max_tokens=CLAUDE_MAX_TOKENS,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+            )
+
+        result = _parse_json_response(response.content[0].text)
+        result["points"] = max(0, min(max_points, result.get("points", 0)))
+        return result
+
     if task_type == "webapp":
         grader_info = ""
         if question_data and question_data.get("grader_info"):
@@ -307,6 +358,7 @@ _ALL_TYPE_DESCRIPTIONS = {
     "drawing": "drawing (Zeichnung/Handschrift auf Canvas)",
     "webapp": "webapp (Interaktive Web-App, z.B. Spreadsheet, Kalkulation, Zuordnungsaufgabe)",
     "feynman": "feynman (Erkläraufgabe: Schüler erklärt ein Konzept einem unwissenden KI-Kollegen im Chat-Dialog)",
+    "scenario": "scenario (Branching-Szenario: Interaktive Entscheidungssimulation, Schüler navigiert durch verzweigende Situationen)",
 }
 
 _ALL_TYPE_QD = {
@@ -320,6 +372,7 @@ _ALL_TYPE_QD = {
     "drawing": '- drawing: {{"grader_info": "Was in der Zeichnung erwartet wird", "canvas_width": 800, "canvas_height": 400}}',
     "webapp": '- webapp: {{"app_description": "Beschreibung der interaktiven App die erstellt werden soll", "grader_info": "Bewertungskriterien für den exportierten App-Zustand"}}',
     "feynman": '- feynman: {{"concept": "Das zu erklärende Konzept", "context": "Fachgebiet/Kontext", "max_turns": 10, "grader_info": "Bewertungskriterien"}}',
+    "scenario": '- scenario: {{"scenario_description": "Ausgangssituation des Szenarios", "context": "Fachgebiet z.B. BWL, Recht", "max_decisions": 5, "grader_info": "Bewertungskriterien für den Entscheidungspfad"}}',
 }
 
 
@@ -416,7 +469,7 @@ async def ai_edit_task(
 nach der Anweisung des Lehrers an. Antworte IMMER als valides JSON.
 WICHTIG: Achte auf korrektes JSON-Escaping! Anführungszeichen innerhalb von String-Werten MÜSSEN escaped werden (\\").
 
-Gültige Aufgabentypen: multichoice, truefalse, shortanswer, numerical, matching, essay, ordering, cloze, description, webapp, feynman
+Gültige Aufgabentypen: multichoice, truefalse, shortanswer, numerical, matching, essay, ordering, cloze, description, webapp, feynman, scenario
 
 question_data Struktur je nach Typ:
 - multichoice: {"single": true, "shuffle": true, "answers": [{"text": "...", "fraction": 100, "feedback": "..."}]}
@@ -429,7 +482,8 @@ question_data Struktur je nach Typ:
 - cloze: {"gaps": [{"type": "shortanswer", "answers": [{"text": "...", "fraction": 100}]}]}
 - description: {}
 - webapp: {"app_description": "Beschreibung der App", "grader_info": "Bewertungskriterien"}
-- feynman: {"concept": "Das zu erklärende Konzept", "context": "Fachgebiet", "max_turns": 10, "grader_info": "Bewertungskriterien"}"""
+- feynman: {"concept": "Das zu erklärende Konzept", "context": "Fachgebiet", "max_turns": 10, "grader_info": "Bewertungskriterien"}
+- scenario: {"scenario_description": "Ausgangssituation", "context": "Fachgebiet", "max_decisions": 5, "grader_info": "Bewertungskriterien"}"""
 
     qdata_str = json.dumps(question_data or {}, ensure_ascii=False)
 
@@ -569,6 +623,68 @@ Deine Rolle:
     return response.content[0].text
 
 
+async def scenario_respond(
+    scenario_description: str, context: str, task_text: str,
+    transcript: list[dict], is_last_decision: bool = False
+) -> dict:
+    """Generate the next situation in a branching scenario. Returns {situation, options, outcome_summary?}."""
+
+    last_decision_instruction = ""
+    if is_last_decision:
+        last_decision_instruction = """
+
+WICHTIG — Dies ist die LETZTE Situation! Keine weiteren Entscheidungen mehr möglich.
+- Gib KEINE Optionen mehr zurück (leeres Array "options": [])
+- Beschreibe das Endergebnis/die Konsequenzen aller bisherigen Entscheidungen
+- Füge ein "outcome_summary" Feld hinzu das den gesamten Verlauf zusammenfasst"""
+
+    system_prompt = f"""Du bist ein Szenario-Erzähler für interaktive Prüfungsaufgaben an einer Berufsschule.
+Du erstellst realistische, verzweigte Szenarien in denen Schüler Entscheidungen treffen müssen.
+
+Szenario: {scenario_description}
+{f"Fachgebiet: {context}" if context else ""}
+Aufgabe: {task_text}
+
+Deine Rolle:
+- Beschreibe die aktuelle Situation lebendig aber knapp (3-5 Sätze)
+- Biete 2-4 realistische Handlungsoptionen an
+- Optionen sollen unterschiedlich gut sein — manche fachlich korrekt, manche riskant, manche falsch
+- Baue die Konsequenzen vorheriger Entscheidungen logisch ein
+- Bleibe im fachlichen Kontext und mache das Szenario lehrreich
+- Verwende "Du" als Ansprache (der Schüler ist die Hauptfigur)
+
+WICHTIG: Antworte IMMER als valides JSON:
+{{
+  "situation": "Beschreibung der aktuellen Situation...",
+  "options": ["Option A", "Option B", "Option C"]
+}}{last_decision_instruction}
+
+Achte auf korrektes JSON-Escaping! Anführungszeichen in Strings MÜSSEN escaped werden."""
+
+    # Build conversation from transcript
+    claude_messages = []
+    for entry in transcript:
+        if entry["role"] == "situation":
+            claude_messages.append({"role": "assistant", "content": json.dumps(entry["data"], ensure_ascii=False)})
+        elif entry["role"] == "decision":
+            claude_messages.append({"role": "user", "content": f"Ich wähle: {entry['content']}"})
+
+    # For initial call (empty transcript), send a start message
+    if not claude_messages:
+        claude_messages = [{"role": "user", "content": "Starte das Szenario."}]
+
+    async with _semaphore:
+        response = await asyncio.to_thread(
+            get_client().messages.create,
+            model=CLAUDE_MODEL,
+            max_tokens=1000,
+            system=system_prompt,
+            messages=claude_messages,
+        )
+
+    return _parse_json_response(response.content[0].text)
+
+
 async def generate_webapp(description: str, grader_info: str = "") -> str:
     """Generate a self-contained HTML/CSS/JS web app for an exam task."""
 
@@ -632,3 +748,61 @@ Antworte NUR mit dem kompletten HTML-Code. Keine Erklärungen, kein Markdown, ke
             lines = lines[:-1]
         html = "\n".join(lines)
     return html
+
+
+async def analyze_class_weaknesses(tasks_with_stats: list[dict]) -> str:
+    """Analyze class-wide weaknesses based on exam results."""
+    system_prompt = """Du bist ein erfahrener Berufsschullehrer und Didaktik-Experte.
+Analysiere die folgenden Klassenarbeitsergebnisse und erstelle eine Schwächenanalyse.
+
+Strukturiere deine Analyse wie folgt:
+
+## Gesamtübersicht
+- Kurze Zusammenfassung der Klassenleistung (2-3 Sätze)
+- Durchschnittliche Erfolgsquote über alle Aufgaben
+
+## Schwächen nach Aufgabe
+(Für jede Aufgabe mit Erfolgsquote unter 70%:)
+### Aufgabe [Nr]: [Titel]
+- **Erfolgsquote:** X%
+- **Häufige Fehler:** Beschreibe die typischen Fehlermuster anhand der Schülerantworten
+- **Mögliche Ursachen:** Warum haben Schüler hier Schwierigkeiten?
+
+## Empfehlungen für den Unterricht
+- Konkrete, umsetzbare Vorschläge zur Nachbereitung
+- Welche Themen sollten nochmal behandelt werden?
+- Methodische Tipps
+
+Halte die Analyse prägnant und praxisnah. Schreibe auf Deutsch.
+Wenn alle Aufgaben über 70% Erfolgsquote haben, erwähne trotzdem die schwächsten Bereiche und gib Optimierungsvorschläge."""
+
+    # Build user message from task stats
+    parts = []
+    for i, t in enumerate(tasks_with_stats, 1):
+        part = f"### Aufgabe {i}: {t['title']}\n"
+        part += f"- Typ: {t['task_type']}\n"
+        part += f"- Aufgabentext: {t['text'][:500]}\n"
+        if t.get("solution"):
+            part += f"- Musterlösung: {t['solution'][:300]}\n"
+        part += f"- Max. Punkte: {t['max_points']}\n"
+        part += f"- Durchschnitt: {t['avg_points']:.1f} Punkte\n"
+        part += f"- Erfolgsquote: {t['success_rate']:.0%}\n"
+        part += f"- Anzahl Schüler: {t['student_count']}\n"
+        if t.get("wrong_answers"):
+            part += "- Falsche/teilweise Antworten:\n"
+            for j, wa in enumerate(t["wrong_answers"], 1):
+                part += f"  {j}. ({wa['points']} Pkt.) {wa['answer']}\n"
+        parts.append(part)
+
+    user_message = "# Klassenarbeitsergebnisse\n\n" + "\n".join(parts)
+
+    async with _semaphore:
+        response = await asyncio.to_thread(
+            get_client().messages.create,
+            model=CLAUDE_MODEL,
+            max_tokens=4000,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+        )
+
+    return response.content[0].text.strip()

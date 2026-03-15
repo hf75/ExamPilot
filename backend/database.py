@@ -158,4 +158,15 @@ async def init_db():
             default_pool_id = default_pool[0]
         await db.execute("UPDATE tasks SET pool_id = ? WHERE pool_id IS NULL", (default_pool_id,))
 
+        # Migration: class analysis cache
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS class_analyses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                exam_id INTEGER NOT NULL UNIQUE,
+                analysis_text TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE
+            )
+        """)
+
         await db.commit()

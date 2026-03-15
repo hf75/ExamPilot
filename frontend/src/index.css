@@ -2688,60 +2688,90 @@ a:hover {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 400px;
+  min-height: 600px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .feynman-info {
-  padding: 8px 16px;
+  padding: 10px 20px;
   font-size: 13px;
+  font-weight: 600;
   color: var(--text-secondary);
+  background: var(--bg-main);
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .feynman-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  background: var(--bg-main);
 }
 
 .feynman-empty {
   text-align: center;
   color: var(--text-secondary);
-  padding: 40px 20px;
+  padding: 60px 20px;
   font-size: 15px;
+  line-height: 1.6;
 }
 
 .feynman-msg {
   max-width: 80%;
-  padding: 10px 14px;
-  border-radius: var(--radius);
-  line-height: 1.5;
+  padding: 12px 16px;
+  border-radius: 16px;
+  line-height: 1.6;
+  font-size: 14px;
+  box-shadow: var(--shadow-sm);
 }
 
 .feynman-msg-student {
   align-self: flex-end;
   background: var(--accent);
   color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.feynman-msg-student .feynman-msg-label {
+  opacity: 0.85;
 }
 
 .feynman-msg-ai {
   align-self: flex-start;
   background: var(--bg-card);
   border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
 }
 
 .feynman-msg-label {
   font-size: 11px;
   font-weight: 700;
-  margin-bottom: 4px;
-  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  opacity: 0.6;
 }
 
 .feynman-msg-content {
   white-space: pre-wrap;
+}
+
+.feynman-msg-content p {
+  margin: 0 0 8px 0;
+}
+
+.feynman-msg-content p:last-child {
+  margin-bottom: 0;
 }
 
 .feynman-typing {
@@ -2751,9 +2781,10 @@ a:hover {
 
 .feynman-input-row {
   display: flex;
-  gap: 8px;
-  padding: 12px;
+  gap: 10px;
+  padding: 16px 20px;
   border-top: 1px solid var(--border);
+  background: var(--bg-card);
   align-items: flex-end;
 }
 
@@ -2761,25 +2792,38 @@ a:hover {
   flex: 1;
   resize: none;
   font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  min-height: 80px;
+}
+
+.feynman-input-row .btn-primary-sm {
+  min-height: 44px;
+  padding: 0 20px;
 }
 
 .feynman-done {
-  padding: 16px;
+  padding: 16px 20px;
   text-align: center;
   color: var(--text-secondary);
   border-top: 1px solid var(--border);
+  background: var(--bg-card);
   font-style: italic;
+  font-size: 13px;
 }
 
 /* Feynman transcript in results */
 .feynman-transcript {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   margin-top: 8px;
-  padding: 12px;
+  padding: 16px;
   background: var(--bg-main);
   border-radius: var(--radius);
+  border: 1px solid var(--border);
 }
 
 /* Feynman split layout support */
@@ -2821,4 +2865,285 @@ a:hover {
   background: var(--accent);
   color: white;
   border-color: var(--accent);
+}
+
+/* Scenario / Branching */
+.scenario-game {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 600px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.scenario-info {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-main);
+  border-bottom: 1px solid var(--border);
+}
+
+.scenario-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.scenario-start {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.scenario-start p {
+  margin-bottom: 20px;
+  font-size: 15px;
+}
+
+.scenario-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.scenario-entry {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+}
+
+.scenario-entry-situation {
+  background: var(--bg-main);
+}
+
+.scenario-entry-decision {
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.scenario-entry-marker {
+  font-size: 18px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.scenario-entry-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.scenario-entry-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.scenario-entry-text {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.scenario-entry-text p {
+  margin: 0 0 6px 0;
+}
+
+.scenario-entry-text p:last-child {
+  margin-bottom: 0;
+}
+
+.scenario-current {
+  margin-top: 8px;
+}
+
+.scenario-situation {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  box-shadow: var(--shadow-sm);
+}
+
+.scenario-situation p {
+  margin: 0 0 8px 0;
+}
+
+.scenario-situation p:last-child {
+  margin-bottom: 0;
+}
+
+.scenario-outcome {
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.scenario-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scenario-option-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+  transition: all 0.15s ease;
+}
+
+.scenario-option-btn:hover {
+  border-color: var(--accent);
+  background: rgba(124, 58, 237, 0.04);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.scenario-option-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.scenario-option-text {
+  padding-top: 3px;
+}
+
+.scenario-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.scenario-done {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* Scenario transcript in results */
+.scenario-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--bg-main);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.task-type-badge.scenario {
+  background: rgba(234, 88, 12, 0.08);
+  color: #c2410c;
+}
+
+.drawing-split-right .scenario-game {
+  flex: 1;
+}
+
+.drawing-split-right .question-renderer:has(.scenario-game) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* Class Analysis Panel */
+.class-analysis-panel {
+  margin-top: 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.class-analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.class-analysis-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.class-analysis-loading {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.class-analysis-content {
+  padding: 20px;
+  line-height: 1.7;
+}
+
+.class-analysis-content h2 {
+  margin-top: 24px;
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.class-analysis-content h3 {
+  margin-top: 16px;
+  margin-bottom: 4px;
+  font-size: 1.05rem;
+}
+
+.class-analysis-content ul {
+  margin: 4px 0 12px 0;
+  padding-left: 20px;
+}
+
+.class-analysis-content li {
+  margin-bottom: 4px;
 }

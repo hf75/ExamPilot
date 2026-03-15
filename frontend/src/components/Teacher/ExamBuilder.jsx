@@ -15,20 +15,18 @@ const GENERATABLE_TYPES = {
   drawing: "Zeichnung",
   webapp: "Web-App",
   feynman: "Feynman-Erklärung",
+  scenario: "Branching-Szenario",
 };
 
 function TaskTypeFilter({ selected, onChange }) {
-  const allSelected = selected.length === 0;
+  const allKeys = Object.keys(GENERATABLE_TYPES);
+  const allSelected = selected.length === allKeys.length;
 
   function toggleType(type) {
-    if (allSelected) {
-      onChange(Object.keys(GENERATABLE_TYPES).filter(t => t !== type));
-    } else if (selected.includes(type)) {
-      const next = selected.filter(t => t !== type);
-      onChange(next.length === 0 ? [] : next);
+    if (selected.includes(type)) {
+      onChange(selected.filter(t => t !== type));
     } else {
-      const next = [...selected, type];
-      onChange(next.length === Object.keys(GENERATABLE_TYPES).length ? [] : next);
+      onChange([...selected, type]);
     }
   }
 
@@ -39,7 +37,7 @@ function TaskTypeFilter({ selected, onChange }) {
         <button
           type="button"
           className={`type-filter-chip ${allSelected ? "active" : ""}`}
-          onClick={() => onChange([])}
+          onClick={() => onChange(allSelected ? [] : [...allKeys])}
         >
           Alle
         </button>
@@ -47,7 +45,7 @@ function TaskTypeFilter({ selected, onChange }) {
           <button
             type="button"
             key={key}
-            className={`type-filter-chip ${!allSelected && selected.includes(key) ? "active" : ""}`}
+            className={`type-filter-chip ${selected.includes(key) ? "active" : ""}`}
             onClick={() => toggleType(key)}
           >
             {label}
@@ -361,7 +359,7 @@ function AdhocExamForm({ onDone, onCancel }) {
     instructions: "",
   });
   const [files, setFiles] = useState([]);
-  const [allowedTypes, setAllowedTypes] = useState([]);
+  const [allowedTypes, setAllowedTypes] = useState(Object.keys(GENERATABLE_TYPES));
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState("");
 
@@ -548,6 +546,7 @@ function TaskPreview({ task, expanded, onToggle, children }) {
     description: "Beschreibung",
     webapp: "Web-App",
     feynman: "Feynman-Erklärung",
+    scenario: "Branching-Szenario",
   };
 
   return (

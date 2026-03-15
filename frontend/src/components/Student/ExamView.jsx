@@ -214,8 +214,8 @@ export default function ExamView() {
           onSelect={handleNavigate}
         />
 
-        <div className={`exam-main ${currentTask?.task_type === "drawing" || currentTask?.task_type === "webapp" || currentTask?.task_type === "feynman" ? "exam-main-drawing" : ""}`}>
-          {currentTask && (currentTask.task_type === "drawing" || currentTask.task_type === "webapp" || currentTask.task_type === "feynman") ? (
+        <div className={`exam-main ${currentTask?.task_type === "drawing" || currentTask?.task_type === "webapp" || currentTask?.task_type === "feynman" || currentTask?.task_type === "scenario" ? "exam-main-drawing" : ""}`}>
+          {currentTask && (currentTask.task_type === "drawing" || currentTask.task_type === "webapp" || currentTask.task_type === "feynman" || currentTask.task_type === "scenario") ? (
                 <div className="drawing-split-layout">
                   <div className="drawing-split-left">
                     <div className="task-header-exam">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import Markdown from "../Markdown";
 
 export default function Results() {
   const { examId } = useParams();
@@ -8,6 +9,9 @@ export default function Results() {
   const [exam, setExam] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
 
   useEffect(() => {
     loadResults();
@@ -23,6 +27,33 @@ export default function Results() {
       navigate("/teacher/exams");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleClassAnalysis() {
+    setShowAnalysis(true);
+    if (analysis) return;
+    setAnalysisLoading(true);
+    try {
+      const data = await api.post(`/api/exams/${examId}/class-analysis`);
+      setAnalysis(data.analysis);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }
+
+  async function handleRegenerateAnalysis() {
+    setAnalysisLoading(true);
+    try {
+      await api.delete(`/api/exams/${examId}/class-analysis`);
+      const data = await api.post(`/api/exams/${examId}/class-analysis`);
+      setAnalysis(data.analysis);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAnalysisLoading(false);
     }
   }
 
@@ -50,6 +81,9 @@ export default function Results() {
           )}
         </div>
         <div className="header-actions">
+          <button className="btn-secondary" onClick={handleClassAnalysis}>
+            Klassen-Analyse
+          </button>
           <button className="btn-secondary" onClick={handleExportPdf}>
             PDF exportieren
           </button>
@@ -111,6 +145,38 @@ export default function Results() {
           ))}
         </tbody>
       </table>
+
+      {showAnalysis && (
+        <div className="class-analysis-panel">
+          <div className="class-analysis-header">
+            <h3>Klassen-Schwächenanalyse</h3>
+            <div style={{ display: "flex", gap: 8 }}>
+              {analysis && (
+                <button
+                  className="btn-small"
+                  onClick={handleRegenerateAnalysis}
+                  disabled={analysisLoading}
+                >
+                  Neu generieren
+                </button>
+              )}
+              <button className="btn-small" onClick={() => setShowAnalysis(false)}>
+                Schließen
+              </button>
+            </div>
+          </div>
+          {analysisLoading ? (
+            <div className="class-analysis-loading">
+              <span className="grading-spinner"></span>
+              KI analysiert die Ergebnisse...
+            </div>
+          ) : analysis ? (
+            <div className="class-analysis-content">
+              <Markdown>{analysis}</Markdown>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {sessions.length === 0 && (
         <p className="empty-state">Noch keine Ergebnisse.</p>

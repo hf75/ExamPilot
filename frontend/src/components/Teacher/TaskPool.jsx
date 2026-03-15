@@ -16,6 +16,7 @@ const TASK_TYPES = {
   description: "Beschreibung",
   webapp: "Web-App",
   feynman: "Feynman-Erklärung",
+  scenario: "Branching-Szenario",
 };
 
 const GENERATABLE_TYPES = {
@@ -29,22 +30,18 @@ const GENERATABLE_TYPES = {
   drawing: "Zeichnung",
   webapp: "Web-App",
   feynman: "Feynman-Erklärung",
+  scenario: "Branching-Szenario",
 };
 
 function TaskTypeFilter({ selected, onChange }) {
-  const allSelected = selected.length === 0;
+  const allKeys = Object.keys(GENERATABLE_TYPES);
+  const allSelected = selected.length === allKeys.length;
 
   function toggleType(type) {
-    if (allSelected) {
-      // From "all" → select only this one's complement (all except this)
-      onChange(Object.keys(GENERATABLE_TYPES).filter(t => t !== type));
-    } else if (selected.includes(type)) {
-      const next = selected.filter(t => t !== type);
-      onChange(next.length === 0 ? [] : next);
+    if (selected.includes(type)) {
+      onChange(selected.filter(t => t !== type));
     } else {
-      const next = [...selected, type];
-      // If all are selected, reset to empty (= all)
-      onChange(next.length === Object.keys(GENERATABLE_TYPES).length ? [] : next);
+      onChange([...selected, type]);
     }
   }
 
@@ -55,7 +52,7 @@ function TaskTypeFilter({ selected, onChange }) {
         <button
           type="button"
           className={`type-filter-chip ${allSelected ? "active" : ""}`}
-          onClick={() => onChange([])}
+          onClick={() => onChange(allSelected ? [] : [...allKeys])}
         >
           Alle
         </button>
@@ -63,7 +60,7 @@ function TaskTypeFilter({ selected, onChange }) {
           <button
             type="button"
             key={key}
-            className={`type-filter-chip ${!allSelected && selected.includes(key) ? "active" : ""}`}
+            className={`type-filter-chip ${selected.includes(key) ? "active" : ""}`}
             onClick={() => toggleType(key)}
           >
             {label}
@@ -460,7 +457,7 @@ export default function TaskPool() {
 
 function DocumentImportModal({ poolId, onClose, onImported }) {
   const [files, setFiles] = useState([]);
-  const [allowedTypes, setAllowedTypes] = useState([]);
+  const [allowedTypes, setAllowedTypes] = useState(Object.keys(GENERATABLE_TYPES));
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState("");
@@ -643,7 +640,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState("mittel");
   const [instructions, setInstructions] = useState("");
-  const [allowedTypes, setAllowedTypes] = useState([]);
+  const [allowedTypes, setAllowedTypes] = useState(Object.keys(GENERATABLE_TYPES));
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);

@@ -152,7 +152,28 @@ export default function StudentResult() {
 
             <div className="result-student-answer">
               <strong>Antwort:</strong>
-              {answer.task_type === "feynman" && answer.student_answer ? (
+              {answer.task_type === "scenario" && answer.student_answer ? (
+                <div className="scenario-transcript">
+                  {(() => {
+                    try {
+                      const entries = JSON.parse(answer.student_answer);
+                      return entries.map((entry, i) => (
+                        <div key={i} className={`scenario-entry scenario-entry-${entry.role}`}>
+                          <div className="scenario-entry-marker">
+                            {entry.role === "situation" ? "\u{1F4CB}" : "\u{1F449}"}
+                          </div>
+                          <div className="scenario-entry-body">
+                            <div className="scenario-entry-label">
+                              {entry.role === "situation" ? "Situation" : "Entscheidung"}
+                            </div>
+                            <div className="scenario-entry-text"><Markdown>{entry.content}</Markdown></div>
+                          </div>
+                        </div>
+                      ));
+                    } catch { return <pre>{answer.student_answer}</pre>; }
+                  })()}
+                </div>
+              ) : answer.task_type === "feynman" && answer.student_answer ? (
                 <div className="feynman-transcript">
                   {(() => {
                     try {

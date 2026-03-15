@@ -5,7 +5,7 @@ from datetime import datetime
 VALID_TASK_TYPES = {
     "multichoice", "truefalse", "shortanswer", "numerical",
     "matching", "ordering", "cloze", "essay", "description",
-    "drawing", "webapp", "feynman",
+    "drawing", "webapp", "feynman", "scenario",
 }
 
 
@@ -145,3 +145,9 @@ class FeynmanChatRequest(BaseModel):
     session_id: int
     task_id: int
     messages: list[dict]
+
+class ScenarioNextRequest(BaseModel):
+    session_id: int
+    task_id: int
+    transcript: list[dict]
+    chosen_option: int | None = None
