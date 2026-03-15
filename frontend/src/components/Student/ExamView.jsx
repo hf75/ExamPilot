@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import QuestionRenderer from "../Questions/QuestionRenderer";
 import TaskNav from "./TaskNav";
+import Markdown from "../Markdown";
 
 export default function ExamView() {
   const { sessionId } = useParams();
@@ -42,6 +43,24 @@ export default function ExamView() {
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [session?.duration_minutes, session?.started_at]);
+
+  // Heartbeat for live dashboard
+  useEffect(() => {
+    if (!session || session.status !== "in_progress") return;
+    const tasks = session.tasks || [];
+    const currentTask = tasks[currentTaskIndex];
+
+    function sendHeartbeat() {
+      api.post("/api/student/heartbeat", {
+        session_id: parseInt(sessionId),
+        current_task_id: currentTask?.id || null,
+      }).catch(() => {});
+    }
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 15000);
+    return () => clearInterval(interval);
+  }, [sessionId, currentTaskIndex, session?.status]);
 
   async function loadSession() {
     try {
@@ -264,7 +283,7 @@ export default function ExamView() {
                         </span>
                       </h3>
                     </div>
-                    <div className="task-text-exam">{currentTask.text}</div>
+                    <div className="task-text-exam"><Markdown>{currentTask.text}</Markdown></div>
 
                     {gradingTasks.has(currentTask.id) && (
                       <div className="grading-lock-banner">
@@ -318,7 +337,7 @@ export default function ExamView() {
                     </h3>
                   </div>
                   {currentTask.task_type !== "cloze" && (
-                    <div className="task-text-exam">{currentTask.text}</div>
+                    <div className="task-text-exam"><Markdown>{currentTask.text}</Markdown></div>
                   )}
 
                   {gradingTasks.has(currentTask.id) && (

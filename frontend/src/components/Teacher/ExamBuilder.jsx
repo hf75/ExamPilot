@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import QuestionRenderer from "../Questions/QuestionRenderer";
+import Markdown from "../Markdown";
 
 export default function ExamBuilder() {
   const navigate = useNavigate();
@@ -507,8 +508,8 @@ function TaskPreview({ task, expanded, onToggle, children }) {
       </div>
       {expanded && (
         <div className="task-preview-body">
-          <div className="task-preview-text">{task.text}</div>
-          {task.hint && <div className="task-preview-hint">Hinweis: {task.hint}</div>}
+          <div className="task-preview-text"><Markdown>{task.text}</Markdown></div>
+          {task.hint && <div className="task-preview-hint">Hinweis: <Markdown>{task.hint}</Markdown></div>}
           <div className="task-preview-question">
             <QuestionRenderer
               task={task}

@@ -447,7 +447,6 @@ a:hover {
   font-size: 14px;
   color: var(--text-secondary);
   margin-bottom: 8px;
-  white-space: pre-wrap;
 }
 
 .task-hint {
@@ -1158,8 +1157,7 @@ a:hover {
   font-size: 15px;
   color: var(--text-secondary);
   margin-bottom: 20px;
-  white-space: pre-wrap;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .explanation-input textarea {
@@ -1409,6 +1407,194 @@ a:hover {
   margin-top: 2px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+/* Progress Matrix (Live Dashboard) */
+.progress-matrix-scroll {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.progress-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.progress-matrix th,
+.progress-matrix td {
+  border: 1px solid var(--border);
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.progress-matrix thead th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+.matrix-name-col {
+  text-align: left !important;
+  min-width: 140px;
+}
+
+.matrix-name-cell {
+  text-align: left !important;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.matrix-task-col {
+  width: 40px;
+  min-width: 40px;
+}
+
+.matrix-status-col {
+  min-width: 60px;
+}
+
+.matrix-status-cell {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.matrix-cell {
+  color: var(--text-secondary);
+}
+
+.matrix-cell.current {
+  background: rgba(34, 209, 142, 0.15);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.matrix-cell.answered {
+  background: rgba(34, 209, 142, 0.25);
+  color: var(--accent);
+}
+
+.matrix-cell.pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+.stuck-badge {
+  display: inline-block;
+  margin-left: 6px;
+  background: var(--error);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.monitor-stat.active strong {
+  color: var(--accent);
+}
+
+.monitor-stat.submitted strong {
+  color: var(--text-secondary);
+}
+
+/* AI Tutor Explanation */
+.btn-explain {
+  background: transparent;
+  color: #a78bfa;
+  border: 1px solid #a78bfa;
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.btn-explain:hover:not(:disabled) {
+  background: rgba(167, 139, 250, 0.1);
+}
+
+.btn-explain:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.explanation-box {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: rgba(167, 139, 250, 0.08);
+  border-left: 3px solid #a78bfa;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.explanation-box strong {
+  color: #a78bfa;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.explanation-text {
+  white-space: pre-wrap;
+  color: var(--text-primary);
+}
+
+/* Markdown content from LLM */
+.md-content {
+  display: inline;
+}
+.md-content p {
+  margin: 0.15em 0;
+}
+.md-content > p:first-child {
+  margin-top: 0;
+}
+.md-content > p:last-child {
+  margin-bottom: 0;
+}
+.md-content ul, .md-content ol {
+  margin: 0.15em 0;
+  padding-left: 1.4em;
+}
+.md-content li {
+  margin: 0;
+  padding: 0;
+  line-height: 1.4;
+}
+.md-content li + li {
+  margin-top: 1px;
+}
+.md-content li p {
+  margin: 0;
+}
+.md-content h1, .md-content h2, .md-content h3,
+.md-content h4, .md-content h5, .md-content h6 {
+  margin: 0.3em 0 0.1em;
+  line-height: 1.3;
+}
+.md-content code {
+  background: var(--bg-secondary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.md-content pre {
+  background: var(--bg-secondary);
+  padding: 8px 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.2em 0;
+}
+.md-content pre code {
+  background: none;
+  padding: 0;
+}
+.md-content blockquote {
+  margin: 0.2em 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--border);
 }
 
 /* Results Table */

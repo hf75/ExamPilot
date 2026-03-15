@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import Markdown from "../Markdown";
 
 export default function StudentResult() {
   const { examId, sessionId } = useParams();
@@ -147,7 +148,7 @@ export default function StudentResult() {
               </div>
             </div>
 
-            <p className="result-task-text">{answer.task_text}</p>
+            <div className="result-task-text"><Markdown>{answer.task_text}</Markdown></div>
 
             <div className="result-student-answer">
               <strong>Antwort:</strong>
@@ -164,18 +165,21 @@ export default function StudentResult() {
 
             {answer.feedback && (
               <div className="result-feedback">
-                <strong>Feedback:</strong> {answer.feedback}
+                <strong>Feedback:</strong>
+                <Markdown>{answer.feedback}</Markdown>
               </div>
             )}
 
             {answer.solution && (
               <div className="result-feedback" style={{ borderLeftColor: "var(--accent)" }}>
-                <strong>Musterlösung:</strong> {answer.solution}
+                <strong>Musterlösung:</strong>
+                <Markdown>{answer.solution}</Markdown>
               </div>
             )}
             {answer.hint && (
               <div className="result-feedback" style={{ borderLeftColor: "var(--border)" }}>
-                <strong>Hinweis:</strong> {answer.hint}
+                <strong>Hinweis:</strong>
+                <Markdown>{answer.hint}</Markdown>
               </div>
             )}
 

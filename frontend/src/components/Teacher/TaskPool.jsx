@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../../api/client";
 import TaskEditor from "./TaskEditor";
+import Markdown from "../Markdown";
 
 const TASK_TYPES = {
   multichoice: "Multiple Choice",
@@ -331,16 +332,16 @@ export default function TaskPool() {
                   <span className="task-points">{task.points} Pkt.</span>
                 </div>
               </div>
-              <p className="task-text">{task.text}</p>
+              <div className="task-text"><Markdown>{task.text}</Markdown></div>
               {task.solution && (
-                <p className="task-hint">
-                  <strong>Musterlösung:</strong> {task.solution}
-                </p>
+                <div className="task-hint">
+                  <strong>Musterlösung:</strong> <Markdown>{task.solution}</Markdown>
+                </div>
               )}
               {task.hint && (
-                <p className="task-hint" style={{ opacity: 0.7 }}>
-                  <strong>Hinweis:</strong> {task.hint}
-                </p>
+                <div className="task-hint" style={{ opacity: 0.7 }}>
+                  <strong>Hinweis:</strong> <Markdown>{task.hint}</Markdown>
+                </div>
               )}
               <div className="task-actions">
                 <button className="btn-small" onClick={() => setEditingTask(task)}>
@@ -550,7 +551,7 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
                       {TASK_TYPES[task.task_type] || task.task_type}
                     </span>
                   </div>
-                  <p>{task.text}</p>
+                  <div><Markdown>{task.text}</Markdown></div>
                   {task._source && <p className="import-source">Quelle: {task._source}</p>}
                 </div>
               ))}
@@ -701,11 +702,11 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
                       {TASK_TYPES[task.task_type] || task.task_type}
                     </span>
                   </div>
-                  <p>{task.text}</p>
+                  <div><Markdown>{task.text}</Markdown></div>
                   {task.solution && (
-                    <p className="task-hint">
-                      <em>Musterlösung: {task.solution}</em>
-                    </p>
+                    <div className="task-hint">
+                      <em>Musterlösung:</em> <Markdown>{task.solution}</Markdown>
+                    </div>
                   )}
                 </div>
               ))}
@@ -838,7 +839,7 @@ function MoodleImportModal({ poolId, onClose, onImported }) {
                       {TASK_TYPES[task.task_type] || task.task_type}
                     </span>
                   </div>
-                  <p>{task.text}</p>
+                  <div><Markdown>{task.text}</Markdown></div>
                 </div>
               ))}
             </div>

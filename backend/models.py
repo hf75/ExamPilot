@@ -133,3 +133,10 @@ class AnswerAdjust(BaseModel):
 class AnswerDispute(BaseModel):
     answer_id: int
     reason: Optional[str] = None
+
+class HeartbeatRequest(BaseModel):
+    session_id: int
+    current_task_id: Optional[int] = None
+
+class ExplainRequest(BaseModel):
+    answer_id: int

@@ -102,6 +102,65 @@ async def get_student_result(
     }
 
 
+@router.get("/{exam_id}/live-progress")
+async def get_live_progress(
+    exam_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Live dashboard data: per-student, per-task progress matrix."""
+    from routers.student import get_student_activity
+    activity = get_student_activity()
+
+    # Get task list for this exam
+    cursor = await db.execute(
+        """SELECT t.id, t.title, et.position FROM exam_tasks et
+           JOIN tasks t ON t.id = et.task_id
+           WHERE et.exam_id = ? ORDER BY et.position""",
+        (exam_id,),
+    )
+    tasks = [dict(row) for row in await cursor.fetchall()]
+
+    # Get all sessions with their answers
+    cursor = await db.execute(
+        """SELECT es.id as session_id, s.name as student_name, es.status,
+                  es.started_at, es.total_points, es.max_points
+           FROM exam_sessions es
+           JOIN students s ON s.id = es.student_id
+           WHERE es.exam_id = ?
+           ORDER BY s.name""",
+        (exam_id,),
+    )
+    sessions_raw = [dict(row) for row in await cursor.fetchall()]
+
+    students = []
+    for s in sessions_raw:
+        sid = s["session_id"]
+        cursor = await db.execute(
+            """SELECT task_id,
+                      CASE WHEN student_answer IS NOT NULL AND student_answer != '' THEN 1 ELSE 0 END as answered,
+                      grading_status
+               FROM answers WHERE session_id = ?""",
+            (sid,),
+        )
+        answers = {}
+        for row in await cursor.fetchall():
+            answers[str(row[0])] = {
+                "answered": bool(row[1]),
+                "grading_status": row[2],
+            }
+
+        act = activity.get(sid, {})
+        students.append({
+            **s,
+            "answers": answers,
+            "current_task_id": act.get("task_id"),
+            "last_seen": act.get("last_seen"),
+        })
+
+    return {"tasks": tasks, "students": students}
+
+
 @router.put("/{exam_id}/answers/{answer_id}/adjust")
 async def adjust_answer(
     exam_id: int,

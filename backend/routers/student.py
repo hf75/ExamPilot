@@ -5,12 +5,16 @@ import aiosqlite
 
 from database import get_db
 from config import DB_PATH
-from models import StudentJoinRequest, AnswerSubmit, AnswerDispute
-from services.claude_service import grade_answer
+from datetime import datetime
+from models import StudentJoinRequest, AnswerSubmit, AnswerDispute, HeartbeatRequest, ExplainRequest
+from services.claude_service import grade_answer, explain_answer
 from services.auto_grader import is_auto_gradable, grade_auto
 from routers.websocket import broadcast
 
 router = APIRouter(prefix="/api/student", tags=["student"])
+
+# In-memory tracking for live dashboard: {session_id: {"task_id": int, "last_seen": str}}
+_student_activity: dict[int, dict] = {}
 
 
 @router.get("/exams")
@@ -193,13 +197,14 @@ async def submit_answer(
 ):
     # Verify session exists and is in progress
     cursor = await db.execute(
-        "SELECT status FROM exam_sessions WHERE id = ?", (req.session_id,)
+        "SELECT status, exam_id FROM exam_sessions WHERE id = ?", (req.session_id,)
     )
     session = await cursor.fetchone()
     if not session:
         raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
     if session[0] != "in_progress":
         raise HTTPException(status_code=400, detail="Klassenarbeit bereits abgegeben")
+    exam_id_for_broadcast = session[1]
 
     # Get task details for grading
     cursor = await db.execute(
@@ -264,6 +269,9 @@ async def submit_answer(
                 (req.session_id, req.task_id, *values),
             )
         await db.commit()
+        await broadcast(exam_id_for_broadcast, "answer_submitted", {
+            "session_id": req.session_id, "task_id": req.task_id, "status": "graded"
+        })
         return {
             "message": "Antwort gespeichert",
             "graded": True,
@@ -294,6 +302,9 @@ async def submit_answer(
         # Launch background grading
         asyncio.create_task(_grade_in_background(answer_id, task, req.student_answer))
 
+        await broadcast(exam_id_for_broadcast, "answer_submitted", {
+            "session_id": req.session_id, "task_id": req.task_id, "status": "pending"
+        })
         return {
             "message": "Antwort gespeichert, Bewertung läuft",
             "graded": False,
@@ -526,3 +537,59 @@ async def get_results(
         "percent": percent,
         "answers": answers,
     }
+
+
+@router.post("/heartbeat")
+async def heartbeat(req: HeartbeatRequest, db: aiosqlite.Connection = Depends(get_db)):
+    """Track which task a student is currently on (for live dashboard)."""
+    cursor = await db.execute(
+        "SELECT exam_id, status FROM exam_sessions WHERE id = ?", (req.session_id,)
+    )
+    session = await cursor.fetchone()
+    if not session or session[1] != "in_progress":
+        return {"ok": True}
+
+    _student_activity[req.session_id] = {
+        "task_id": req.current_task_id,
+        "last_seen": datetime.utcnow().isoformat(),
+    }
+    return {"ok": True}
+
+
+def get_student_activity():
+    """Expose activity data for the results router."""
+    return _student_activity
+
+
+@router.post("/explain")
+async def explain_task(req: ExplainRequest, db: aiosqlite.Connection = Depends(get_db)):
+    """AI tutor: explain a task to the student after exam submission."""
+    cursor = await db.execute(
+        """SELECT a.*, t.text as task_text, t.solution, t.task_type, t.points as max_points
+           FROM answers a JOIN tasks t ON t.id = a.task_id
+           WHERE a.id = ?""",
+        (req.answer_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Antwort nicht gefunden")
+    answer = dict(row)
+
+    # Verify session is submitted
+    cursor = await db.execute(
+        "SELECT status FROM exam_sessions WHERE id = ?", (answer["session_id"],)
+    )
+    session = await cursor.fetchone()
+    if not session or session[0] == "in_progress":
+        raise HTTPException(status_code=400, detail="Klassenarbeit noch nicht abgegeben")
+
+    explanation = await explain_answer(
+        task_text=answer["task_text"],
+        solution=answer.get("solution") or "",
+        student_answer=answer.get("student_answer") or "",
+        points_awarded=answer.get("points_awarded") or 0,
+        max_points=answer["max_points"],
+        feedback=answer.get("feedback") or "",
+        task_type=answer["task_type"],
+    )
+    return {"explanation": explanation}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import Markdown from "../Markdown";
 
 export default function ResultView() {
   const { sessionId } = useParams();
@@ -10,6 +11,8 @@ export default function ResultView() {
   const [disputeId, setDisputeId] = useState(null);
   const [disputeReason, setDisputeReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [explanations, setExplanations] = useState({});
+  const [loadingExplain, setLoadingExplain] = useState({});
 
   const loadResults = useCallback(() => {
     setLoading(true);
@@ -41,6 +44,18 @@ export default function ResultView() {
       alert(err.message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleExplain(answerId) {
+    setLoadingExplain((prev) => ({ ...prev, [answerId]: true }));
+    try {
+      const data = await api.post("/api/student/explain", { answer_id: answerId });
+      setExplanations((prev) => ({ ...prev, [answerId]: data.explanation }));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoadingExplain((prev) => ({ ...prev, [answerId]: false }));
     }
   }
 
@@ -107,7 +122,7 @@ export default function ResultView() {
                 </span>
               </div>
             </div>
-            <p className="result-task-text">{answer.task_text}</p>
+            <div className="result-task-text"><Markdown>{answer.task_text}</Markdown></div>
             <div className="result-student-answer">
               <strong>Deine Antwort:</strong>
               {answer.student_answer?.startsWith("data:image") ? (
@@ -122,12 +137,32 @@ export default function ResultView() {
             </div>
             {answer.feedback && (
               <div className="result-feedback">
-                <strong>Feedback:</strong> {answer.feedback}
+                <strong>Feedback:</strong>
+                <Markdown>{answer.feedback}</Markdown>
               </div>
             )}
             {answer.solution && (
               <div className="result-feedback" style={{ borderLeftColor: "var(--accent)" }}>
-                <strong>Musterlösung:</strong> {answer.solution}
+                <strong>Musterlösung:</strong>
+                <Markdown>{answer.solution}</Markdown>
+              </div>
+            )}
+
+            {/* AI Tutor */}
+            {explanations[answer.id] ? (
+              <div className="explanation-box">
+                <strong>KI-Nachhilfe:</strong>
+                <Markdown>{explanations[answer.id]}</Markdown>
+              </div>
+            ) : (
+              <div className="task-actions" style={{ marginTop: 8 }}>
+                <button
+                  className="btn-explain"
+                  onClick={() => handleExplain(answer.id)}
+                  disabled={loadingExplain[answer.id]}
+                >
+                  {loadingExplain[answer.id] ? "Wird erklärt..." : "Erkläre mir das"}
+                </button>
               </div>
             )}
 

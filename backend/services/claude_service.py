@@ -279,3 +279,56 @@ Antworte als JSON:
         )
 
     return _parse_json_response(response.content[0].text)
+
+
+async def explain_answer(
+    task_text: str,
+    solution: str,
+    student_answer: str,
+    points_awarded: float,
+    max_points: int,
+    feedback: str,
+    task_type: str,
+) -> str:
+    """Generate a personalized tutoring explanation for a student."""
+    system_prompt = """Du bist ein freundlicher Nachhilfelehrer an einer Berufsschule.
+Ein Schüler hat gerade eine Klassenarbeit geschrieben und möchte verstehen,
+was er falsch gemacht hat bzw. wie er sich verbessern kann.
+
+Erkläre auf einfache, ermutigende Weise:
+1. Was die richtige Antwort ist und warum
+2. Wo der Schüler Fehler gemacht hat (falls vorhanden)
+3. Einen hilfreichen Tipp zum Merken/Verstehen
+
+Antworte auf Deutsch, in 3-5 kurzen Absätzen. Verwende einfache Sprache.
+Sei ermutigend aber ehrlich."""
+
+    user_message = f"""Aufgabe: {task_text}
+
+Musterlösung: {solution or "Nicht verfügbar"}
+
+Antwort des Schülers: {student_answer or "Keine Antwort"}
+
+Erreichte Punkte: {points_awarded}/{max_points}
+Bewertungs-Feedback: {feedback or "Kein Feedback"}
+
+Bitte erkläre dem Schüler, was richtig/falsch war und wie er es besser machen kann."""
+
+    if task_type == "drawing" and student_answer and student_answer.startswith("data:image"):
+        image_data = student_answer.split(",", 1)[1] if "," in student_answer else student_answer
+        user_content = [
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image_data}},
+            {"type": "text", "text": user_message},
+        ]
+    else:
+        user_content = user_message
+
+    async with _semaphore:
+        response = await asyncio.to_thread(
+            get_client().messages.create,
+            model=CLAUDE_MODEL,
+            max_tokens=2000,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_content}],
+        )
+    return response.content[0].text
