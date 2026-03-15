@@ -13,6 +13,7 @@ const TASK_TYPES = {
   ordering: "Reihenfolge",
   description: "Beschreibung",
   webapp: "Web-App",
+  feynman: "Feynman-Erklärung",
 };
 
 function getDefaultQuestionData(type) {
@@ -40,6 +41,8 @@ function getDefaultQuestionData(type) {
       return { gaps: [] };
     case "webapp":
       return { app_html: "", grader_info: "", app_description: "" };
+    case "feynman":
+      return { concept: "", context: "", max_turns: 10, grader_info: "" };
     case "description":
       return {};
     default:
@@ -217,6 +220,9 @@ export default function TaskEditor({ task, poolId, onSave, onCancel }) {
           )}
           {form.task_type === "webapp" && (
             <WebAppConfig qd={qd} onChange={updateQD} />
+          )}
+          {form.task_type === "feynman" && (
+            <FeynmanConfig qd={qd} onChange={updateQD} />
           )}
         </div>
 
@@ -774,6 +780,51 @@ function ClozeConfig({ qd, onChange }) {
       <button type="button" className="btn-small" onClick={addGap} style={{ marginTop: 8 }}>
         + Lücke hinzufügen
       </button>
+    </div>
+  );
+}
+
+function FeynmanConfig({ qd, onChange }) {
+  return (
+    <div className="qd-section">
+      <h4>Feynman-Erklärung Konfiguration</h4>
+      <div className="form-group">
+        <label>Konzept (was soll erklärt werden?)</label>
+        <input
+          type="text"
+          value={qd.concept || ""}
+          onChange={(e) => onChange({ concept: e.target.value })}
+          placeholder="z.B. Deckungsbeitragsrechnung, OSI-Modell, SQL-Joins"
+        />
+      </div>
+      <div className="form-group">
+        <label>Kontext / Fachgebiet</label>
+        <input
+          type="text"
+          value={qd.context || ""}
+          onChange={(e) => onChange({ context: e.target.value })}
+          placeholder="z.B. BWL, Netzwerktechnik, Datenbanken"
+        />
+      </div>
+      <div className="form-group">
+        <label>Maximale Nachrichten ({qd.max_turns || 10})</label>
+        <input
+          type="range"
+          min="3"
+          max="30"
+          value={qd.max_turns || 10}
+          onChange={(e) => onChange({ max_turns: parseInt(e.target.value) || 10 })}
+        />
+      </div>
+      <div className="form-group">
+        <label>Bewertungskriterien für die KI</label>
+        <textarea
+          value={qd.grader_info || ""}
+          onChange={(e) => onChange({ grader_info: e.target.value })}
+          placeholder="z.B. Schüler soll alle 7 Schichten des OSI-Modells nennen und ihre Funktion erklären können"
+          rows={3}
+        />
+      </div>
     </div>
   );
 }

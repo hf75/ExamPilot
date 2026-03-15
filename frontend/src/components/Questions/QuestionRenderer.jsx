@@ -9,6 +9,7 @@ import Ordering from "./Ordering";
 import Description from "./Description";
 import Drawing from "./Drawing";
 import WebApp from "./WebApp";
+import Feynman from "./Feynman";
 
 const COMPONENTS = {
   multichoice: MultiChoice,
@@ -22,9 +23,10 @@ const COMPONENTS = {
   description: Description,
   drawing: Drawing,
   webapp: WebApp,
+  feynman: Feynman,
 };
 
-export default function QuestionRenderer({ task, answer, onChange, disabled }) {
+export default function QuestionRenderer({ task, answer, onChange, disabled, sessionId }) {
   const Component = COMPONENTS[task.task_type] || Essay;
 
   return (
@@ -35,6 +37,7 @@ export default function QuestionRenderer({ task, answer, onChange, disabled }) {
         answer={answer}
         onChange={onChange}
         disabled={disabled}
+        sessionId={sessionId}
       />
     </div>
   );

@@ -1,4 +1,5 @@
 import json
+import re
 import asyncio
 from anthropic import Anthropic
 
@@ -18,7 +19,7 @@ def get_client():
 
 
 def _parse_json_response(text: str) -> dict | list:
-    """Extract JSON from Claude's response, handling markdown code blocks."""
+    """Extract JSON from Claude's response, with repair for common issues."""
     text = text.strip()
     # Remove markdown code blocks
     if text.startswith("```"):
@@ -27,7 +28,45 @@ def _parse_json_response(text: str) -> dict | list:
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         text = "\n".join(lines)
-    return json.loads(text)
+
+    # First attempt: parse as-is
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Repair attempt: fix common Claude JSON issues
+    repaired = text
+
+    # Fix truncated output: close open brackets/braces
+    open_brackets = repaired.count("[") - repaired.count("]")
+    open_braces = repaired.count("{") - repaired.count("}")
+    if open_brackets > 0 or open_braces > 0:
+        # Find last complete object (ending with })
+        last_brace = repaired.rfind("}")
+        if last_brace != -1:
+            repaired = repaired[: last_brace + 1]
+            repaired = repaired.rstrip().rstrip(",")
+            repaired += "]" * max(0, repaired.count("[") - repaired.count("]"))
+
+    # Remove trailing commas before ] or }
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+
+    # Last resort: find the outermost JSON array or object
+    for pattern in [r"\[.*\]", r"\{.*\}"]:
+        match = re.search(pattern, repaired, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group())
+            except json.JSONDecodeError:
+                continue
+
+    raise ValueError(f"Konnte kein gültiges JSON aus der KI-Antwort extrahieren.")
 
 
 async def grade_answer(
@@ -41,15 +80,65 @@ async def grade_answer(
 ) -> dict:
     """Grade essay, shortanswer, drawing or webapp using Claude. Returns {points, correct, feedback}."""
 
+    if task_type == "feynman":
+        grader_info = ""
+        if question_data and question_data.get("grader_info"):
+            grader_info = f"\nBewertungskriterien des Lehrers: {question_data['grader_info']}"
+
+        concept = (question_data or {}).get("concept", "")
+
+        system_prompt = f"""Du bist ein Prüfer an einer Berufsschule.
+Schreibe das Feedback in direkter Ansprache ("Du hast...", "Dir fehlt..."), nicht in dritter Person.
+
+Bewerte das folgende Gespräch, in dem ein Konzept einem Kollegen erklärt wurde (Feynman-Methode).
+Das Konzept: {concept}
+
+Bewerte:
+- Wurde das Konzept korrekt und vollständig erklärt?
+- Wurden falsche Aussagen des Gesprächspartners erkannt und korrigiert?
+- Wurden verständliche Beispiele oder Analogien verwendet?
+- Zeigt das Gespräch tiefes Verständnis des Themas?{grader_info}
+
+Antworte als JSON:
+{{
+  "points": <0 bis {max_points}>,
+  "correct": true/false,
+  "feedback": "Begründung in Du-Form mit Hinweis was gut war und was fehlte"
+}}"""
+
+        solution_text = solution or "Keine Angabe"
+        user_message = f"""Aufgabe: {task_text}
+
+Musterlösung: {solution_text}
+
+Gesprächsprotokoll:
+{student_answer}
+
+Maximale Punktzahl: {max_points}"""
+
+        async with _semaphore:
+            response = await asyncio.to_thread(
+                get_client().messages.create,
+                model=CLAUDE_MODEL,
+                max_tokens=CLAUDE_MAX_TOKENS,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+            )
+
+        result = _parse_json_response(response.content[0].text)
+        result["points"] = max(0, min(max_points, result.get("points", 0)))
+        return result
+
     if task_type == "webapp":
         grader_info = ""
         if question_data and question_data.get("grader_info"):
             grader_info = f"\nBewertungskriterien: {question_data['grader_info']}"
 
         system_prompt = f"""Du bist ein Prüfer an einer Berufsschule.
+Schreibe das Feedback in direkter Ansprache ("Du hast...", "Dir fehlt..."), nicht in dritter Person.
 
-Bewerte die Arbeit eines Schülers in einer interaktiven Web-App-Aufgabe.
-Du erhältst den exportierten Zustand (JSON) der App nach Bearbeitung durch den Schüler.
+Bewerte die Arbeit in einer interaktiven Web-App-Aufgabe.
+Du erhältst den exportierten Zustand (JSON) der App nach Bearbeitung.
 - Prüfe ob die Aufgabe korrekt und vollständig gelöst wurde
 - Bewerte anhand der Aufgabenstellung und Bewertungskriterien
 - Berücksichtige Teilleistungen{grader_info}
@@ -58,7 +147,7 @@ Antworte als JSON:
 {{
   "points": <0 bis {max_points}>,
   "correct": true/false,
-  "feedback": "Begründung mit Hinweis was fehlte oder falsch war"
+  "feedback": "Begründung in Du-Form mit Hinweis was fehlte oder falsch war"
 }}"""
 
         solution_text = solution or "Keine Angabe"
@@ -90,8 +179,9 @@ Maximale Punktzahl: {max_points}"""
             grader_info = f"\nBewertungshinweis: {question_data['grader_info']}"
 
         system_prompt = f"""Du bist ein Prüfer an einer Berufsschule.
+Schreibe das Feedback in direkter Ansprache ("Du hast...", "Dir fehlt..."), nicht in dritter Person.
 
-Bewerte die folgende Zeichnung/Handschrift eines Schülers.
+Bewerte die folgende Zeichnung/Handschrift.
 - Prüfe ob die Zeichnung die gestellte Aufgabe korrekt beantwortet
 - Bewerte Vollständigkeit, Korrektheit und Klarheit
 - Beschriftungen und Details sind wichtig{grader_info}
@@ -100,7 +190,7 @@ Antworte als JSON:
 {{
   "points": <0 bis {max_points}>,
   "correct": true/false,
-  "feedback": "Begründung mit Hinweis was fehlte oder falsch war"
+  "feedback": "Begründung in Du-Form mit Hinweis was fehlte oder falsch war"
 }}"""
 
         solution_text = solution or task_hint or "Keine Angabe"
@@ -146,8 +236,9 @@ Antworte als JSON:
                 reference_answers = f"\nReferenzantworten: {', '.join(refs)}"
 
         system_prompt = f"""Du bist ein Prüfer an einer Berufsschule.
+Schreibe das Feedback in direkter Ansprache ("Du hast...", "Dir fehlt..."), nicht in dritter Person.
 
-Bewerte die folgende Kurzantwort eines Schülers.
+Bewerte die folgende Kurzantwort.
 - Prüfe ob die Antwort inhaltlich korrekt ist
 - Kleine Schreibfehler oder abweichende Formulierungen sind akzeptabel, solange der Inhalt stimmt
 - Bewerte semantisch, nicht nur per exaktem Textvergleich{reference_answers}
@@ -156,7 +247,7 @@ Antworte als JSON:
 {{
   "points": <0 bis {max_points}>,
   "correct": true/false,
-  "feedback": "Kurze Begründung auf Deutsch (max 2 Sätze)"
+  "feedback": "Kurze Begründung in Du-Form auf Deutsch (max 2 Sätze)"
 }}"""
     else:
         grader_info = ""
@@ -164,8 +255,9 @@ Antworte als JSON:
             grader_info = f"\nBewertungshinweis: {question_data['grader_info']}"
 
         system_prompt = f"""Du bist ein Prüfer an einer Berufsschule.
+Schreibe das Feedback in direkter Ansprache ("Du hast...", "Dir fehlt..."), nicht in dritter Person.
 
-Bewerte die folgende Textantwort eines Schülers.
+Bewerte die folgende Textantwort.
 - Fachliche Korrektheit ist am wichtigsten
 - Formulierung muss nicht perfekt sein
 - Alle relevanten Aspekte der Frage müssen abgedeckt sein{grader_info}
@@ -174,7 +266,7 @@ Antworte als JSON:
 {{
   "points": <0 bis {max_points}>,
   "correct": true/false,
-  "feedback": "Begründung mit Hinweis was fehlte oder falsch war"
+  "feedback": "Begründung in Du-Form mit Hinweis was fehlte oder falsch war"
 }}"""
 
     solution_text = solution or task_hint or "Keine Angabe"
@@ -204,26 +296,62 @@ Maximale Punktzahl: {max_points}"""
     return result
 
 
-async def generate_tasks(topic: str, count: int, difficulty: str, instructions: str = "") -> list:
+_ALL_TYPE_DESCRIPTIONS = {
+    "multichoice": "multichoice (Multiple Choice mit Antwortoptionen)",
+    "truefalse": "truefalse (Wahr/Falsch-Aussagen)",
+    "shortanswer": "shortanswer (Kurzantwort)",
+    "numerical": "numerical (Zahlenwert mit Toleranz)",
+    "matching": "matching (Zuordnung von Paaren)",
+    "essay": "essay (Freitext / längere Erklärung)",
+    "ordering": "ordering (Reihenfolge sortieren)",
+    "drawing": "drawing (Zeichnung/Handschrift auf Canvas)",
+    "webapp": "webapp (Interaktive Web-App, z.B. Spreadsheet, Kalkulation, Zuordnungsaufgabe)",
+    "feynman": "feynman (Erkläraufgabe: Schüler erklärt ein Konzept einem unwissenden KI-Kollegen im Chat-Dialog)",
+}
+
+_ALL_TYPE_QD = {
+    "multichoice": '- multichoice: {{"single": true, "shuffle": true, "answers": [{{"text": "Option A", "fraction": 100, "feedback": "Richtig!"}}, {{"text": "Option B", "fraction": 0, "feedback": "Falsch"}}]}}',
+    "truefalse": '- truefalse: {{"correct_answer": true, "feedback_true": "Richtig!", "feedback_false": "Falsch."}}',
+    "shortanswer": '- shortanswer: {{"answers": [{{"text": "Erwartete Antwort", "fraction": 100}}]}}',
+    "numerical": '- numerical: {{"answers": [{{"value": 42, "tolerance": 0.1, "fraction": 100}}]}}',
+    "matching": '- matching: {{"shuffle": true, "pairs": [{{"question": "Begriff", "answer": "Definition"}}]}}',
+    "essay": '- essay: {{"grader_info": "Erwartete Lösung und Bewertungskriterien"}}',
+    "ordering": '- ordering: {{"items": ["Erster Schritt", "Zweiter Schritt", "Dritter Schritt"]}}',
+    "drawing": '- drawing: {{"grader_info": "Was in der Zeichnung erwartet wird", "canvas_width": 800, "canvas_height": 400}}',
+    "webapp": '- webapp: {{"app_description": "Beschreibung der interaktiven App die erstellt werden soll", "grader_info": "Bewertungskriterien für den exportierten App-Zustand"}}',
+    "feynman": '- feynman: {{"concept": "Das zu erklärende Konzept", "context": "Fachgebiet/Kontext", "max_turns": 10, "grader_info": "Bewertungskriterien"}}',
+}
+
+
+def _build_type_prompt(allowed_types: list[str] | None = None) -> tuple[str, str]:
+    """Build type list and question_data docs filtered by allowed_types.
+    Returns (type_list_str, qd_docs_str)."""
+    if allowed_types:
+        types = [t for t in allowed_types if t in _ALL_TYPE_DESCRIPTIONS]
+    else:
+        types = list(_ALL_TYPE_DESCRIPTIONS.keys())
+
+    type_lines = "\n".join(f"- {_ALL_TYPE_DESCRIPTIONS[t]}" for t in types)
+    qd_lines = "\n".join(_ALL_TYPE_QD[t] for t in types if t in _ALL_TYPE_QD)
+    type_names = "|".join(types)
+    return type_lines, qd_lines, type_names
+
+
+async def generate_tasks(topic: str, count: int, difficulty: str, instructions: str = "", allowed_types: list[str] | None = None) -> list:
     """Generate exam tasks using Claude."""
+
+    type_lines, qd_lines, type_names = _build_type_prompt(allowed_types)
 
     system_prompt = """Du bist ein erfahrener Lehrer an einer Berufsschule.
 Erstelle praxisnahe Prüfungsaufgaben in verschiedenen Fragetypen.
-Antworte IMMER als JSON-Array."""
+Antworte IMMER als valides JSON-Array.
+WICHTIG: Achte auf korrektes JSON-Escaping! Anführungszeichen innerhalb von String-Werten MÜSSEN escaped werden (\\"). Verwende keine unescapten " innerhalb von JSON-Strings."""
 
     user_message = f"""Generiere {count} Prüfungsaufgaben zum Thema "{topic}".
 Schwierigkeitsgrad: {difficulty}
 
-Verwende einen Mix aus diesen Fragetypen:
-- multichoice (Multiple Choice mit Antwortoptionen)
-- truefalse (Wahr/Falsch-Aussagen)
-- shortanswer (Kurzantwort)
-- numerical (Zahlenwert mit Toleranz)
-- matching (Zuordnung von Paaren)
-- essay (Freitext / längere Erklärung)
-- ordering (Reihenfolge sortieren)
-- drawing (Zeichnung/Handschrift auf Canvas)
-- webapp (Interaktive Web-App, z.B. Spreadsheet, Kalkulation, Zuordnungsaufgabe — nur wenn das Thema sich dafür eignet)
+Verwende AUSSCHLIESSLICH diese Fragetypen:
+{type_lines}
 
 Antworte als JSON-Array:
 [
@@ -233,22 +361,14 @@ Antworte als JSON-Array:
     "hint": "Optionaler Hinweis für den Schüler",
     "solution": "Ausführliche Musterlösung (wird nach der Prüfung angezeigt und zur Bewertung genutzt)",
     "topic": "{topic}",
-    "task_type": "multichoice|truefalse|shortanswer|numerical|matching|essay|ordering|drawing|webapp",
+    "task_type": "{type_names}",
     "points": 1-5,
     "question_data": {{ ... }}
   }}
 ]
 
 question_data Struktur je nach Typ:
-- multichoice: {{"single": true, "shuffle": true, "answers": [{{"text": "Option A", "fraction": 100, "feedback": "Richtig!"}}, {{"text": "Option B", "fraction": 0, "feedback": "Falsch"}}]}}
-- truefalse: {{"correct_answer": true, "feedback_true": "Richtig!", "feedback_false": "Falsch."}}
-- shortanswer: {{"answers": [{{"text": "Erwartete Antwort", "fraction": 100}}]}}
-- numerical: {{"answers": [{{"value": 42, "tolerance": 0.1, "fraction": 100}}]}}
-- matching: {{"shuffle": true, "pairs": [{{"question": "Begriff", "answer": "Definition"}}]}}
-- essay: {{"grader_info": "Erwartete Lösung und Bewertungskriterien"}}
-- ordering: {{"items": ["Erster Schritt", "Zweiter Schritt", "Dritter Schritt"]}}
-- drawing: {{"grader_info": "Was in der Zeichnung erwartet wird", "canvas_width": 800, "canvas_height": 400}}
-- webapp: {{"app_description": "Beschreibung der interaktiven App die erstellt werden soll", "grader_info": "Bewertungskriterien für den exportierten App-Zustand"}}"""
+{qd_lines}"""
 
     if instructions:
         user_message += f"\n\nZusätzliche Anweisungen des Lehrers:\n{instructions}"
@@ -293,9 +413,10 @@ async def ai_edit_task(
     """Edit a task based on a teacher's natural language instruction."""
 
     system_prompt = """Du bist ein erfahrener Lehrer. Passe die gegebene Prüfungsaufgabe
-nach der Anweisung des Lehrers an. Antworte IMMER als JSON.
+nach der Anweisung des Lehrers an. Antworte IMMER als valides JSON.
+WICHTIG: Achte auf korrektes JSON-Escaping! Anführungszeichen innerhalb von String-Werten MÜSSEN escaped werden (\\").
 
-Gültige Aufgabentypen: multichoice, truefalse, shortanswer, numerical, matching, essay, ordering, cloze, description, webapp
+Gültige Aufgabentypen: multichoice, truefalse, shortanswer, numerical, matching, essay, ordering, cloze, description, webapp, feynman
 
 question_data Struktur je nach Typ:
 - multichoice: {"single": true, "shuffle": true, "answers": [{"text": "...", "fraction": 100, "feedback": "..."}]}
@@ -307,7 +428,8 @@ question_data Struktur je nach Typ:
 - ordering: {"items": ["Erster", "Zweiter", "Dritter"]}
 - cloze: {"gaps": [{"type": "shortanswer", "answers": [{"text": "...", "fraction": 100}]}]}
 - description: {}
-- webapp: {"app_description": "Beschreibung der App", "grader_info": "Bewertungskriterien"}"""
+- webapp: {"app_description": "Beschreibung der App", "grader_info": "Bewertungskriterien"}
+- feynman: {"concept": "Das zu erklärende Konzept", "context": "Fachgebiet", "max_turns": 10, "grader_info": "Bewertungskriterien"}"""
 
     qdata_str = json.dumps(question_data or {}, ensure_ascii=False)
 
@@ -358,22 +480,21 @@ async def explain_answer(
 ) -> str:
     """Generate a personalized tutoring explanation for a student."""
     system_prompt = """Du bist ein freundlicher Nachhilfelehrer an einer Berufsschule.
-Ein Schüler hat gerade eine Klassenarbeit geschrieben und möchte verstehen,
-was er falsch gemacht hat bzw. wie er sich verbessern kann.
+Du sprichst den Schüler direkt mit "Du" an.
 
 Erkläre auf einfache, ermutigende Weise:
 1. Was die richtige Antwort ist und warum
-2. Wo der Schüler Fehler gemacht hat (falls vorhanden)
+2. Wo Fehler gemacht wurden (falls vorhanden)
 3. Einen hilfreichen Tipp zum Merken/Verstehen
 
-Antworte auf Deutsch, in 3-5 kurzen Absätzen. Verwende einfache Sprache.
+Antworte auf Deutsch, in 3-5 kurzen Absätzen. Verwende einfache Sprache und direkte Ansprache.
 Sei ermutigend aber ehrlich."""
 
     user_message = f"""Aufgabe: {task_text}
 
 Musterlösung: {solution or "Nicht verfügbar"}
 
-Antwort des Schülers: {student_answer or "Keine Antwort"}
+Gegebene Antwort: {student_answer or "Keine Antwort"}
 
 Erreichte Punkte: {points_awarded}/{max_points}
 Bewertungs-Feedback: {feedback or "Kein Feedback"}
@@ -396,6 +517,54 @@ Bitte erkläre dem Schüler, was richtig/falsch war und wie er es besser machen 
             max_tokens=2000,
             system=system_prompt,
             messages=[{"role": "user", "content": user_content}],
+        )
+    return response.content[0].text
+
+
+async def feynman_respond(concept: str, context: str, task_text: str, messages: list[dict], is_last_turn: bool = False) -> str:
+    """Generate the AI colleague's response in a Feynman teaching dialogue."""
+
+    last_turn_instruction = ""
+    if is_last_turn:
+        last_turn_instruction = """
+
+WICHTIG — Dies ist deine LETZTE Antwort! Der Schüler kann danach NICHT mehr antworten.
+- Stelle KEINE Fragen mehr
+- Sage KEINE falschen Aussagen mehr die noch korrigiert werden müssten
+- Bedanke dich für die Erklärung und verabschiede dich freundlich
+- Du kannst kurz zusammenfassen was du "gelernt" hast (bleibe in deiner Rolle als unwissender Kollege)"""
+
+    system_prompt = f"""Du bist ein Arbeitskollege, der ein Konzept NICHT versteht und es sich erklären lässt.
+Du spielst einen freundlichen aber unwissenden Kollegen.
+
+Das Konzept, das dir erklärt werden soll: {concept}
+{f"Kontext/Fachgebiet: {context}" if context else ""}
+Aufgabe: {task_text}
+
+Deine Rolle:
+- Tu so, als wüsstest du NICHTS über das Thema
+- Stelle Rückfragen wenn etwas unklar ist ("Was genau meinst du mit...?", "Kannst du das nochmal anders erklären?")
+- Sage ab und zu bewusst etwas Falsches, um zu testen ob dein Gegenüber dich korrigiert
+  (z.B. "Ah, also ist das wie [falsche Analogie]?" oder "Dann bedeutet [Begriff] ja [falsche Definition], oder?")
+- Bitte gelegentlich um ein konkretes Beispiel
+- Sei freundlich, neugierig und motivierend
+- Halte deine Antworten kurz (2-4 Sätze)
+- Sage NIEMALS die richtige Antwort selbst
+- Bewerte NICHT — du bist nur der Gesprächspartner{last_turn_instruction}"""
+
+    # Convert transcript to Claude message format
+    claude_messages = []
+    for msg in messages:
+        role = "user" if msg["role"] == "student" else "assistant"
+        claude_messages.append({"role": role, "content": msg["content"]})
+
+    async with _semaphore:
+        response = await asyncio.to_thread(
+            get_client().messages.create,
+            model=CLAUDE_MODEL,
+            max_tokens=500,
+            system=system_prompt,
+            messages=claude_messages,
         )
     return response.content[0].text
 

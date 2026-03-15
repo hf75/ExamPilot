@@ -15,7 +15,64 @@ const TASK_TYPES = {
   drawing: "Zeichnung",
   description: "Beschreibung",
   webapp: "Web-App",
+  feynman: "Feynman-Erklärung",
 };
+
+const GENERATABLE_TYPES = {
+  multichoice: "Multiple Choice",
+  truefalse: "Wahr/Falsch",
+  shortanswer: "Kurzantwort",
+  numerical: "Numerisch",
+  matching: "Zuordnung",
+  ordering: "Reihenfolge",
+  essay: "Freitext",
+  drawing: "Zeichnung",
+  webapp: "Web-App",
+  feynman: "Feynman-Erklärung",
+};
+
+function TaskTypeFilter({ selected, onChange }) {
+  const allSelected = selected.length === 0;
+
+  function toggleType(type) {
+    if (allSelected) {
+      // From "all" → select only this one's complement (all except this)
+      onChange(Object.keys(GENERATABLE_TYPES).filter(t => t !== type));
+    } else if (selected.includes(type)) {
+      const next = selected.filter(t => t !== type);
+      onChange(next.length === 0 ? [] : next);
+    } else {
+      const next = [...selected, type];
+      // If all are selected, reset to empty (= all)
+      onChange(next.length === Object.keys(GENERATABLE_TYPES).length ? [] : next);
+    }
+  }
+
+  return (
+    <div className="form-group">
+      <label>Erlaubte Aufgabentypen</label>
+      <div className="type-filter-grid">
+        <button
+          type="button"
+          className={`type-filter-chip ${allSelected ? "active" : ""}`}
+          onClick={() => onChange([])}
+        >
+          Alle
+        </button>
+        {Object.entries(GENERATABLE_TYPES).map(([key, label]) => (
+          <button
+            type="button"
+            key={key}
+            className={`type-filter-chip ${!allSelected && selected.includes(key) ? "active" : ""}`}
+            onClick={() => toggleType(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function TaskPool() {
   const [pools, setPools] = useState([]);
@@ -403,6 +460,7 @@ export default function TaskPool() {
 
 function DocumentImportModal({ poolId, onClose, onImported }) {
   const [files, setFiles] = useState([]);
+  const [allowedTypes, setAllowedTypes] = useState([]);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState("");
@@ -430,6 +488,9 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
         setLoadingStatus(`Dokument ${i + 1} von ${files.length}: ${files[i].name}`);
         const formData = new FormData();
         formData.append("file", files[i]);
+        if (allowedTypes.length > 0) {
+          formData.append("allowed_types", allowedTypes.join(","));
+        }
         const res = await fetch(
           `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/tasks/import-document`,
           {
@@ -529,6 +590,7 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
               </div>
             )}
             <p className="qd-hint">Die KI analysiert jedes Dokument einzeln und erstellt automatisch passende Aufgaben.</p>
+            <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} />
             {loading && loadingStatus && (
               <p className="import-status">{loadingStatus}</p>
             )}
@@ -581,6 +643,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState("mittel");
   const [instructions, setInstructions] = useState("");
+  const [allowedTypes, setAllowedTypes] = useState([]);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -594,6 +657,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
         count,
         difficulty,
         instructions: instructions.trim() || undefined,
+        allowed_types: allowedTypes.length > 0 ? allowedTypes : undefined,
       });
       setPreview(data.tasks);
     } catch (err) {
@@ -679,10 +743,11 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
               <textarea
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
-                placeholder="z.B. 'Die Datenbank-ERMs sollen von den Schülern gezeichnet werden' oder 'Nur Multiple-Choice-Fragen'"
+                placeholder="z.B. 'Die Datenbank-ERMs sollen von den Schülern gezeichnet werden'"
                 rows={3}
               />
             </div>
+            <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} />
             <button
               className="btn-primary"
               onClick={handleGenerate}

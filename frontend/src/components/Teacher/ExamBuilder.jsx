@@ -4,6 +4,60 @@ import { api } from "../../api/client";
 import QuestionRenderer from "../Questions/QuestionRenderer";
 import Markdown from "../Markdown";
 
+const GENERATABLE_TYPES = {
+  multichoice: "Multiple Choice",
+  truefalse: "Wahr/Falsch",
+  shortanswer: "Kurzantwort",
+  numerical: "Numerisch",
+  matching: "Zuordnung",
+  ordering: "Reihenfolge",
+  essay: "Freitext",
+  drawing: "Zeichnung",
+  webapp: "Web-App",
+  feynman: "Feynman-Erklärung",
+};
+
+function TaskTypeFilter({ selected, onChange }) {
+  const allSelected = selected.length === 0;
+
+  function toggleType(type) {
+    if (allSelected) {
+      onChange(Object.keys(GENERATABLE_TYPES).filter(t => t !== type));
+    } else if (selected.includes(type)) {
+      const next = selected.filter(t => t !== type);
+      onChange(next.length === 0 ? [] : next);
+    } else {
+      const next = [...selected, type];
+      onChange(next.length === Object.keys(GENERATABLE_TYPES).length ? [] : next);
+    }
+  }
+
+  return (
+    <div className="form-group">
+      <label>Erlaubte Aufgabentypen</label>
+      <div className="type-filter-grid">
+        <button
+          type="button"
+          className={`type-filter-chip ${allSelected ? "active" : ""}`}
+          onClick={() => onChange([])}
+        >
+          Alle
+        </button>
+        {Object.entries(GENERATABLE_TYPES).map(([key, label]) => (
+          <button
+            type="button"
+            key={key}
+            className={`type-filter-chip ${!allSelected && selected.includes(key) ? "active" : ""}`}
+            onClick={() => toggleType(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ExamBuilder() {
   const navigate = useNavigate();
   const [exams, setExams] = useState([]);
@@ -307,6 +361,7 @@ function AdhocExamForm({ onDone, onCancel }) {
     instructions: "",
   });
   const [files, setFiles] = useState([]);
+  const [allowedTypes, setAllowedTypes] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState("");
 
@@ -344,6 +399,9 @@ function AdhocExamForm({ onDone, onCancel }) {
       formData.append("date", form.date);
       formData.append("duration_minutes", form.duration_minutes || "");
       formData.append("instructions", form.instructions);
+      if (allowedTypes.length > 0) {
+        formData.append("allowed_types", allowedTypes.join(","));
+      }
 
       const result = await api.postForm("/api/exams/generate-adhoc", formData);
       setProgress(
@@ -436,6 +494,8 @@ function AdhocExamForm({ onDone, onCancel }) {
           />
         </div>
 
+        <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} />
+
         <div className="form-group">
           <label>Beschreibung (optional)</label>
           <textarea
@@ -487,6 +547,7 @@ function TaskPreview({ task, expanded, onToggle, children }) {
     essay: "Freitext",
     description: "Beschreibung",
     webapp: "Web-App",
+    feynman: "Feynman-Erklärung",
   };
 
   return (

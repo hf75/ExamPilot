@@ -1,7 +1,7 @@
 import json
 import tempfile
 import os
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional
@@ -18,6 +18,7 @@ class GenerateRequest(BaseModel):
     count: int = 5
     difficulty: str = "mittel"
     instructions: str = ""
+    allowed_types: list[str] = []
 
 
 class GenerateWebAppRequest(BaseModel):
@@ -123,6 +124,7 @@ async def delete_task(
 @router.post("/import-document")
 async def import_document_endpoint(
     file: UploadFile = File(...),
+    allowed_types: str = Form(""),
     _: bool = Depends(require_teacher),
 ):
     """Import tasks from PDF or DOCX via AI analysis."""
@@ -133,6 +135,8 @@ async def import_document_endpoint(
 
     from services.doc_import import import_document
 
+    types_list = [t.strip() for t in allowed_types.split(",") if t.strip()] if allowed_types.strip() else None
+
     suffix = f".{ext}"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         content = await file.read()
@@ -140,7 +144,7 @@ async def import_document_endpoint(
         tmp_path = tmp.name
 
     try:
-        tasks = await import_document(tmp_path, filename)
+        tasks = await import_document(tmp_path, filename, types_list)
         return {"tasks": tasks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Dokumentimport fehlgeschlagen: {str(e)}")
@@ -154,7 +158,7 @@ async def generate_tasks_endpoint(
     _: bool = Depends(require_teacher),
 ):
     try:
-        tasks = await ai_generate_tasks(req.topic, req.count, req.difficulty, req.instructions)
+        tasks = await ai_generate_tasks(req.topic, req.count, req.difficulty, req.instructions, req.allowed_types)
         return {"tasks": tasks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"KI-Generierung fehlgeschlagen: {str(e)}")

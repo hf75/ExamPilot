@@ -200,6 +200,7 @@ async def generate_adhoc_exam(
     date: str = Form(""),
     duration_minutes: Optional[str] = Form(None),
     instructions: str = Form(""),
+    allowed_types: str = Form(""),
     db: aiosqlite.Connection = Depends(get_db),
     _: bool = Depends(require_teacher),
 ):
@@ -208,6 +209,9 @@ async def generate_adhoc_exam(
     get a complete exam with AI-generated tasks.
     """
     from services.doc_import import import_document_with_instructions
+
+    # Parse allowed_types from comma-separated string
+    types_list = [t.strip() for t in allowed_types.split(",") if t.strip()] if allowed_types.strip() else None
 
     # Parse duration_minutes (FormData sends empty string for empty fields)
     dur_mins = None
@@ -245,7 +249,7 @@ async def generate_adhoc_exam(
 
         try:
             tasks = await import_document_with_instructions(
-                tmp_path, f.filename or "document", instructions
+                tmp_path, f.filename or "document", instructions, types_list
             )
             for task in tasks:
                 task["source"] = f.filename

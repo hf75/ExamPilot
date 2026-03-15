@@ -125,7 +125,23 @@ export default function ResultView() {
             <div className="result-task-text"><Markdown>{answer.task_text}</Markdown></div>
             <div className="result-student-answer">
               <strong>Deine Antwort:</strong>
-              {answer.task_type === "webapp" && answer.app_html ? (
+              {answer.task_type === "feynman" && answer.student_answer ? (
+                <div className="feynman-transcript">
+                  {(() => {
+                    try {
+                      const msgs = JSON.parse(answer.student_answer);
+                      return msgs.map((msg, i) => (
+                        <div key={i} className={`feynman-msg feynman-msg-${msg.role}`}>
+                          <div className="feynman-msg-label">
+                            {msg.role === "student" ? "Schüler" : "Kollege"}
+                          </div>
+                          <div className="feynman-msg-content"><Markdown>{msg.content}</Markdown></div>
+                        </div>
+                      ));
+                    } catch { return <pre>{answer.student_answer}</pre>; }
+                  })()}
+                </div>
+              ) : answer.task_type === "webapp" && answer.app_html ? (
                 <div className="webapp-result" style={{ marginTop: 8 }}>
                   <div className="webapp-iframe-container">
                     <div className="webapp-overlay" />

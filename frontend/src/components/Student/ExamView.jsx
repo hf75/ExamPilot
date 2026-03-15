@@ -214,8 +214,8 @@ export default function ExamView() {
           onSelect={handleNavigate}
         />
 
-        <div className={`exam-main ${currentTask?.task_type === "drawing" || currentTask?.task_type === "webapp" ? "exam-main-drawing" : ""}`}>
-          {currentTask && (currentTask.task_type === "drawing" || currentTask.task_type === "webapp") ? (
+        <div className={`exam-main ${currentTask?.task_type === "drawing" || currentTask?.task_type === "webapp" || currentTask?.task_type === "feynman" ? "exam-main-drawing" : ""}`}>
+          {currentTask && (currentTask.task_type === "drawing" || currentTask.task_type === "webapp" || currentTask.task_type === "feynman") ? (
                 <div className="drawing-split-layout">
                   <div className="drawing-split-left">
                     <div className="task-header-exam">
@@ -257,6 +257,7 @@ export default function ExamView() {
                       answer={answers[currentTask.id] || ""}
                       onChange={(value) => handleAnswerChange(currentTask.id, value)}
                       disabled={false}
+                      sessionId={parseInt(sessionId)}
                     />
                   </div>
                 </div>
