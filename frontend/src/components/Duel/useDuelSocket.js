@@ -1,27 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// Debug log — collects recent entries for on-screen display
-const _debugLog = [];
-function dlog(msg) {
-  const ts = new Date().toISOString().slice(11, 23);
-  const entry = `[${ts}] ${msg}`;
-  console.log("[DuelWS]", entry);
-  _debugLog.push(entry);
-  if (_debugLog.length > 30) _debugLog.shift();
-}
-export function getDuelDebugLog() { return _debugLog; }
-
 function getWsBase() {
   const apiUrl = import.meta.env.VITE_API_URL;
   if (apiUrl) {
-    dlog(`WS base from VITE_API_URL: ${apiUrl.replace(/^http/, "ws")}`);
     return apiUrl.replace(/^http/, "ws");
   }
-  // In production, backend serves frontend — use same host
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const base = `${proto}//${window.location.host}`;
-  dlog(`WS base from location: ${base}`);
-  return base;
+  return `${proto}//${window.location.host}`;
 }
 
 export default function useDuelSocket(roomCode, onConnect) {
@@ -76,14 +61,11 @@ export default function useDuelSocket(roomCode, onConnect) {
   }
 
   const connect = useCallback(() => {
-    if (!roomCode) { dlog("connect() skipped — no roomCode"); return; }
-
-    dlog(`connect() called for room ${roomCode}`);
+    if (!roomCode) return;
 
     // Clean up previous connection WITHOUT triggering onclose handler
     cleanup();
     if (wsRef.current) {
-      dlog("Closing previous WS (intentional)");
       closedIntentionallyRef.current = true;
       try { wsRef.current.close(); } catch {}
       wsRef.current = null;
@@ -92,13 +74,10 @@ export default function useDuelSocket(roomCode, onConnect) {
     setGameState((s) => ({ ...s, phase: "connecting", error: null }));
 
     const wsBase = getWsBase();
-    const wsUrl = `${wsBase}/ws/duel/${roomCode}`;
-    dlog(`Opening WS: ${wsUrl}`);
     let ws;
     try {
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(`${wsBase}/ws/duel/${roomCode}`);
     } catch (e) {
-      dlog(`WS constructor error: ${e.message}`);
       setGameState((s) => ({
         ...s,
         phase: "error",
@@ -108,10 +87,8 @@ export default function useDuelSocket(roomCode, onConnect) {
     }
     wsRef.current = ws;
     closedIntentionallyRef.current = false;
-    dlog(`WS created, readyState=${ws.readyState}`);
 
     ws.onopen = () => {
-      dlog(`WS onopen, readyState=${ws.readyState}`);
       setGameState((s) => ({ ...s, phase: "connected", error: null }));
 
       // Start ping keepalive
@@ -121,17 +98,13 @@ export default function useDuelSocket(roomCode, onConnect) {
 
       // Fire connect callback (sends join or host_connect)
       if (onConnectRef.current) {
-        dlog("Firing onConnect callback (join/host_connect)");
         onConnectRef.current(ws);
-      } else {
-        dlog("WARNING: no onConnect callback!");
       }
 
       // Safety timeout: if still on "connected" after 6s, server didn't respond
       joinTimeoutRef.current = setTimeout(() => {
         setGameState((prev) => {
           if (prev.phase === "connected") {
-            dlog("JOIN TIMEOUT — still on 'connected' after 6s, no joined/host_connected received");
             return {
               ...prev,
               phase: "error",
@@ -148,14 +121,9 @@ export default function useDuelSocket(roomCode, onConnect) {
       try {
         msg = JSON.parse(evt.data);
       } catch {
-        dlog(`WS message parse error: ${evt.data?.substring(0, 100)}`);
         return;
       }
       const { event, data } = msg;
-
-      if (event !== "pong") {
-        dlog(`WS event: ${event} ${event === "error" ? JSON.stringify(data) : ""}`);
-      }
 
       // Clear join timeout on first meaningful response
       if (event !== "pong") {
@@ -277,8 +245,7 @@ export default function useDuelSocket(roomCode, onConnect) {
       });
     };
 
-    ws.onclose = (ev) => {
-      dlog(`WS onclose — code=${ev.code} reason="${ev.reason}" intentional=${closedIntentionallyRef.current}`);
+    ws.onclose = () => {
       cleanup();
       // Ignore close if we intentionally closed (during reconnect)
       if (closedIntentionallyRef.current) {
@@ -286,15 +253,13 @@ export default function useDuelSocket(roomCode, onConnect) {
         return;
       }
       setGameState((s) => {
-        dlog(`WS onclose — current phase=${s.phase}`);
         // Don't override game_over with disconnected
         if (s.phase === "game_over") return s;
         return { ...s, phase: "disconnected" };
       });
     };
 
-    ws.onerror = (ev) => {
-      dlog(`WS onerror — readyState=${ws.readyState} type=${ev?.type}`);
+    ws.onerror = () => {
       cleanup();
       setGameState((s) => ({
         ...s,
