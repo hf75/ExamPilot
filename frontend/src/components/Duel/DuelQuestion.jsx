@@ -20,15 +20,17 @@ export default function DuelQuestion({ question, timerSeconds, onAnswer, answere
 
   const timerPercent = (timeLeft / timerSeconds) * 100;
   const timerUrgent = timeLeft < 5;
+  const expired = timeLeft <= 0;
+  const locked = answered || expired;
 
   function handleOptionClick(value) {
-    if (answered) return;
+    if (locked) return;
     onAnswer(String(value));
   }
 
   function handleNumericalSubmit(e) {
     e.preventDefault();
-    if (answered || !inputValue.trim()) return;
+    if (locked || !inputValue.trim()) return;
     onAnswer(inputValue.trim());
   }
 
@@ -52,15 +54,15 @@ export default function DuelQuestion({ question, timerSeconds, onAnswer, answere
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Antwort eingeben..."
             className="duel-numerical-input"
-            disabled={answered}
+            disabled={locked}
             autoFocus
           />
           <button
             type="submit"
             className="duel-btn duel-btn-submit"
-            disabled={answered || !inputValue.trim()}
+            disabled={locked || !inputValue.trim()}
           >
-            {answered ? "Gesendet" : "Antworten"}
+            {answered ? "Gesendet" : expired ? "Zeit abgelaufen" : "Antworten"}
           </button>
         </form>
       ) : (
@@ -68,9 +70,9 @@ export default function DuelQuestion({ question, timerSeconds, onAnswer, answere
           {question.options?.map((opt, i) => (
             <button
               key={i}
-              className={`duel-option ${OPTION_COLORS[i % 4]} ${answered ? "disabled" : ""}`}
+              className={`duel-option ${OPTION_COLORS[i % 4]} ${locked ? "disabled" : ""}`}
               onClick={() => handleOptionClick(opt.index)}
-              disabled={answered}
+              disabled={locked}
             >
               <span className="duel-option-label">{OPTION_LABELS[i]}</span>
               <span className="duel-option-text">{opt.text}</span>
@@ -81,6 +83,9 @@ export default function DuelQuestion({ question, timerSeconds, onAnswer, answere
 
       {answered && (
         <div className="duel-waiting-badge">Warte auf andere Spieler...</div>
+      )}
+      {expired && !answered && (
+        <div className="duel-waiting-badge duel-expired-badge">Zeit abgelaufen!</div>
       )}
     </div>
   );
