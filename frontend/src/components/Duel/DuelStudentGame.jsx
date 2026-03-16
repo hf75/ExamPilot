@@ -1,6 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import useDuelSocket from "./useDuelSocket";
+import useDuelSocket, { getDuelDebugLog } from "./useDuelSocket";
 import DuelLobby from "./DuelLobby";
 import DuelCountdown from "./DuelCountdown";
 import DuelQuestion from "./DuelQuestion";
@@ -12,10 +12,14 @@ export default function DuelStudentGame() {
   const { roomCode } = useParams();
   const [searchParams] = useSearchParams();
   const playerName = searchParams.get("name") || "";
+  const [showDebug, setShowDebug] = useState(false);
 
   const handleConnect = useCallback((ws) => {
     if (playerName) {
+      console.log("[DuelStudent] Sending join, name=", playerName, "readyState=", ws.readyState);
       ws.send(JSON.stringify({ action: "join", name: playerName }));
+    } else {
+      console.warn("[DuelStudent] handleConnect but no playerName!");
     }
   }, [playerName]);
 
@@ -146,6 +150,27 @@ export default function DuelStudentGame() {
           winner={gameState.winner}
           mode={gameState.mode}
         />
+      )}
+
+      {/* Debug panel — tap version number 3x to open */}
+      <div
+        className="duel-debug-trigger"
+        onClick={() => setShowDebug((v) => !v)}
+        style={{ position: "fixed", bottom: 4, right: 4, fontSize: 10, color: "#333", padding: 8, zIndex: 9999 }}
+      >
+        v{showDebug ? "-" : "+"}
+      </div>
+      {showDebug && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, maxHeight: "40vh",
+          overflow: "auto", background: "#000", color: "#0f0", fontSize: 11,
+          fontFamily: "monospace", padding: 8, zIndex: 9998, whiteSpace: "pre-wrap"
+        }}>
+          <div>phase: {phase} | room: {roomCode} | name: {playerName} | playerId: {gameState.myPlayerId || "none"}</div>
+          <div>wsBase: {window.location.protocol === "https:" ? "wss:" : "ws:"}//{window.location.host}</div>
+          <hr style={{ borderColor: "#333" }} />
+          {getDuelDebugLog().map((line, i) => <div key={i}>{line}</div>)}
+        </div>
       )}
     </div>
   );
