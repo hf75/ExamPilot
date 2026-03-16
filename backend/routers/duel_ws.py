@@ -9,7 +9,7 @@ from services.duel_engine import (
     submit_answer, advance_round, send_to_host, serialize_lobby,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 router = APIRouter()
 

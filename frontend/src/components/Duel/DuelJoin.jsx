@@ -9,13 +9,13 @@ export default function DuelJoin() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
+  const [debugInfo, setDebugInfo] = useState("");
   const navigate = useNavigate();
   const nameRef = useRef();
   const codeRef = useRef();
 
   // Focus the right field on mount
   useEffect(() => {
-    // Small delay ensures mobile keyboard opens reliably
     const timer = setTimeout(() => {
       if (prefilledCode && nameRef.current) {
         nameRef.current.focus();
@@ -31,6 +31,7 @@ export default function DuelJoin() {
     if (joining) return;
 
     setError("");
+    setDebugInfo("");
     const roomCode = code.trim().toUpperCase();
     const playerName = name.trim();
     if (!roomCode || !playerName) {
@@ -39,11 +40,26 @@ export default function DuelJoin() {
     }
 
     setJoining(true);
+    setDebugInfo("REST-Call: Prüfe Raum...");
+
     try {
-      await api.get(`/api/duels/room/${roomCode}`);
-      navigate(`/duel/play/${roomCode}?name=${encodeURIComponent(playerName)}`);
-    } catch {
+      const roomData = await api.get(`/api/duels/room/${roomCode}`);
+      setDebugInfo(`Raum gefunden (${roomData.phase}, ${roomData.player_count} Spieler). Navigiere...`);
+
+      // Small delay to ensure state update renders before navigation
+      const targetUrl = `/duel/play/${roomCode}?name=${encodeURIComponent(playerName)}`;
+      console.log("[DuelJoin] Navigating to:", targetUrl);
+      setDebugInfo(`Navigiere zu: ${targetUrl}`);
+
+      // Use setTimeout to break out of the React event handler
+      // Some mobile browsers block navigation inside async handlers
+      setTimeout(() => {
+        navigate(targetUrl);
+      }, 50);
+    } catch (err) {
+      console.error("[DuelJoin] Error:", err);
       setError("Raum nicht gefunden");
+      setDebugInfo(`Fehler: ${err.message}`);
       setJoining(false);
     }
   }
@@ -95,6 +111,16 @@ export default function DuelJoin() {
             {joining ? "Verbinde..." : "Beitreten"}
           </button>
         </form>
+
+        {debugInfo && (
+          <div style={{
+            marginTop: 12, padding: 10, borderRadius: 8,
+            background: "rgba(0,240,255,0.1)", border: "1px solid rgba(0,240,255,0.3)",
+            fontSize: 12, color: "#aaa", wordBreak: "break-all"
+          }}>
+            {debugInfo}
+          </div>
+        )}
 
         <div className="duel-join-footer">
           <a href="/">Zurück zur Startseite</a>
