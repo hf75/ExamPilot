@@ -93,8 +93,6 @@ export default function DuelTeacherLive() {
           rankings={gameState.rankings}
           round={gameState.round}
           totalRounds={gameState.totalRounds}
-          isHost={true}
-          onNextRound={() => send("next_round")}
         />
       )}
 

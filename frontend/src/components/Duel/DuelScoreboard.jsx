@@ -1,5 +1,6 @@
-export default function DuelScoreboard({ rankings, round, totalRounds, isHost, onNextRound }) {
+export default function DuelScoreboard({ rankings, round, totalRounds }) {
   const maxScore = rankings.length > 0 ? Math.max(rankings[0]?.score || 1, 1) : 1;
+  const isLastRound = round >= totalRounds;
 
   return (
     <div className="duel-scoreboard">
@@ -15,7 +16,7 @@ export default function DuelScoreboard({ rankings, round, totalRounds, isHost, o
             style={{ animationDelay: `${i * 0.1}s` }}
           >
             <span className="duel-rank">
-              {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
+              {i === 0 ? "\u{1F947}" : i === 1 ? "\u{1F948}" : i === 2 ? "\u{1F949}" : `${i + 1}.`}
             </span>
             <span className="duel-rank-name">{p.name}</span>
             {p.streak >= 2 && (
@@ -35,10 +36,8 @@ export default function DuelScoreboard({ rankings, round, totalRounds, isHost, o
         ))}
       </div>
 
-      {isHost && round < totalRounds && (
-        <button className="duel-btn duel-btn-next" onClick={onNextRound}>
-          Nächste Frage
-        </button>
+      {!isLastRound && (
+        <div className="duel-auto-advance-hint">Nächste Frage kommt gleich...</div>
       )}
     </div>
   );

@@ -450,7 +450,14 @@ async def _show_scoreboard(room: GameRoom):
     elif room.current_round >= room.total_rounds:
         await asyncio.sleep(3)
         await _end_game(room)
-    # Otherwise wait for host to trigger next round
+    else:
+        # Auto-advance to next round after showing scoreboard
+        await asyncio.sleep(5)
+        if room.phase == "scoreboard":
+            room.phase = "countdown"
+            await broadcast_to_room(room, "game_starting", {"countdown": 3})
+            await asyncio.sleep(3)
+            await _send_question(room)
 
 
 async def _end_game(room: GameRoom):

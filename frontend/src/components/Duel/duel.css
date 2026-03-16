@@ -558,6 +558,14 @@
   font-size: 1.2rem;
 }
 
+.duel-auto-advance-hint {
+  text-align: center;
+  margin-top: 28px;
+  color: var(--duel-text-dim);
+  font-style: italic;
+  animation: pulse 2s infinite;
+}
+
 .duel-ranking-list {
   display: flex;
   flex-direction: column;

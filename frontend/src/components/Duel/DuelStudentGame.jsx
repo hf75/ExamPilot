@@ -137,7 +137,6 @@ export default function DuelStudentGame() {
           rankings={gameState.rankings}
           round={gameState.round}
           totalRounds={gameState.totalRounds}
-          isHost={false}
         />
       )}
 
