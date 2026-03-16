@@ -1075,6 +1075,118 @@
   color: #e21b3c;
 }
 
+/* ---- Live answer feed ---- */
+.duel-answer-feed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 28px;
+  min-height: 48px;
+}
+
+.duel-answer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  animation: chip-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.duel-answer-chip-icon {
+  font-size: 1.3em;
+}
+
+.duel-answer-chip-name {
+  white-space: nowrap;
+}
+
+/* Each effect = unique color + animation */
+.effect-zap {
+  background: linear-gradient(135deg, #f59e0b, #eab308);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.6), 0 0 40px rgba(245, 158, 11, 0.2);
+  animation: chip-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both, effect-zap-pulse 0.6s ease 0.4s;
+}
+
+.effect-flame {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6), 0 0 40px rgba(249, 115, 22, 0.2);
+  animation: chip-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both, effect-flame-flicker 0.8s ease 0.4s;
+}
+
+.effect-star {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.6), 0 0 40px rgba(99, 102, 241, 0.2);
+  animation: chip-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both, effect-star-spin 0.7s ease 0.3s;
+}
+
+.effect-boom {
+  background: linear-gradient(135deg, #ec4899, #f43f5e);
+  box-shadow: 0 0 20px rgba(236, 72, 153, 0.6), 0 0 40px rgba(244, 63, 94, 0.2);
+  animation: chip-enter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both, effect-boom-shake 0.5s ease 0.3s;
+}
+
+.effect-wave {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.6), 0 0 40px rgba(59, 130, 246, 0.2);
+  animation: chip-enter 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both, effect-wave-wobble 0.8s ease 0.4s;
+}
+
+.effect-glow {
+  background: linear-gradient(135deg, #10b981, #14b8a6);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.6), 0 0 40px rgba(20, 184, 166, 0.2);
+  animation: chip-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both, effect-glow-breathe 1s ease 0.3s;
+}
+
+@keyframes chip-enter {
+  0% { opacity: 0; transform: scale(0.3) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes effect-zap-pulse {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.25); box-shadow: 0 0 30px rgba(245, 158, 11, 0.9); }
+  60% { transform: scale(0.95); }
+}
+
+@keyframes effect-flame-flicker {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  20% { transform: scale(1.1) rotate(-2deg); }
+  40% { transform: scale(1.15) rotate(2deg); }
+  60% { transform: scale(1.05) rotate(-1deg); }
+}
+
+@keyframes effect-star-spin {
+  0% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.2) rotate(180deg); }
+  100% { transform: scale(1) rotate(360deg); }
+}
+
+@keyframes effect-boom-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-6px) scale(1.15); }
+  30% { transform: translateX(6px) scale(1.15); }
+  45% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+}
+
+@keyframes effect-wave-wobble {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-8px); }
+  50% { transform: translateY(4px); }
+  75% { transform: translateY(-4px); }
+}
+
+@keyframes effect-glow-breathe {
+  0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.6); }
+  50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.9), 0 0 60px rgba(16, 185, 129, 0.4); transform: scale(1.08); }
+}
+
 /* ---- Center messages ---- */
 .duel-center-message {
   font-size: 1.3rem;

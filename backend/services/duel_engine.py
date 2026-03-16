@@ -360,11 +360,12 @@ async def submit_answer(room: GameRoom, player_id: str, answer: str):
         if room.mode == "royale":
             player.alive = False
 
-    # Notify host that someone answered
+    # Notify everyone that someone answered
     alive_players = [p for p in room.players.values() if p.alive and p.ws]
     answered_count = sum(1 for p in alive_players if p.current_answer is not None)
-    await send_to_host(room, "player_answered", {
+    await broadcast_to_room(room, "player_answered", {
         "player_id": player_id,
+        "player_name": player.name,
         "answered_count": answered_count,
         "total_players": len(alive_players),
     })

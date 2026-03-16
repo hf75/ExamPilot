@@ -76,6 +76,7 @@ export default function DuelTeacherLive() {
           answeredCount={gameState.answeredCount}
           totalPlayers={gameState.totalPlayers}
           timerSeconds={gameState.timerSeconds}
+          answeredPlayers={gameState.answeredPlayers}
         />
       )}
 
@@ -108,7 +109,9 @@ export default function DuelTeacherLive() {
 }
 
 
-function LiveQuestion({ question, round, totalRounds, answeredCount, totalPlayers, timerSeconds }) {
+const EFFECTS = ["effect-zap", "effect-flame", "effect-star", "effect-boom", "effect-wave", "effect-glow"];
+
+function LiveQuestion({ question, round, totalRounds, answeredCount, totalPlayers, timerSeconds, answeredPlayers }) {
   const { timeLeft } = useLiveTimer(timerSeconds);
   const timerPercent = (timeLeft / timerSeconds) * 100;
 
@@ -147,6 +150,26 @@ function LiveQuestion({ question, round, totalRounds, answeredCount, totalPlayer
           <span>Numerische Eingabe</span>
         </div>
       )}
+
+      {/* Live answer feed — names fly in with random effects */}
+      <div className="duel-answer-feed">
+        {answeredPlayers.map((ap, i) => {
+          const effect = EFFECTS[i % EFFECTS.length];
+          return (
+            <div key={`${ap.id}-${ap.ts}`} className={`duel-answer-chip ${effect}`}>
+              <span className="duel-answer-chip-icon">{
+                effect === "effect-zap" ? "\u26A1" :
+                effect === "effect-flame" ? "\uD83D\uDD25" :
+                effect === "effect-star" ? "\u2B50" :
+                effect === "effect-boom" ? "\uD83D\uDCA5" :
+                effect === "effect-wave" ? "\uD83C\uDF0A" :
+                "\u2728"
+              }</span>
+              <span className="duel-answer-chip-name">{ap.name}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -25,6 +25,7 @@ export default function useDuelSocket(roomCode, onConnect) {
     myAlive: true,
     answered: false,
     answeredCount: 0,
+    answeredPlayers: [],
     totalPlayers: 0,
     mode: "duel",
     winner: null,
@@ -183,6 +184,7 @@ export default function useDuelSocket(roomCode, onConnect) {
               timerSeconds: data.timer_seconds,
               answered: false,
               answeredCount: 0,
+              answeredPlayers: [],
               correctInfo: null,
               playerResults: [],
               eliminations: [],
@@ -193,6 +195,9 @@ export default function useDuelSocket(roomCode, onConnect) {
               ...prev,
               answeredCount: data.answered_count,
               totalPlayers: data.total_players,
+              answeredPlayers: data.player_name
+                ? [...prev.answeredPlayers, { name: data.player_name, id: data.player_id, ts: Date.now() }]
+                : prev.answeredPlayers,
             };
 
           case "round_results": {
