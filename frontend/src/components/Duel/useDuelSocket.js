@@ -37,9 +37,9 @@ export default function useDuelSocket(roomCode, onConnect) {
 
   const wsRef = useRef(null);
   const pingRef = useRef(null);
-  const connectTimeoutRef = useRef(null);
+  const joinTimeoutRef = useRef(null);
   const onConnectRef = useRef(onConnect);
-  const reconnectCountRef = useRef(0);
+  const closedIntentionallyRef = useRef(false);
   onConnectRef.current = onConnect;
 
   const send = useCallback((action, data = {}) => {
@@ -53,16 +53,23 @@ export default function useDuelSocket(roomCode, onConnect) {
     setGameState((s) => ({ ...s, answered: true }));
   }, []);
 
-  // Reconnect function — can be called manually or on close
+  function cleanup() {
+    clearInterval(pingRef.current);
+    pingRef.current = null;
+    clearTimeout(joinTimeoutRef.current);
+    joinTimeoutRef.current = null;
+  }
+
   const connect = useCallback(() => {
     if (!roomCode) return;
 
-    // Clean up previous connection
+    // Clean up previous connection WITHOUT triggering onclose handler
+    cleanup();
     if (wsRef.current) {
+      closedIntentionallyRef.current = true;
       try { wsRef.current.close(); } catch {}
+      wsRef.current = null;
     }
-    clearInterval(pingRef.current);
-    clearTimeout(connectTimeoutRef.current);
 
     setGameState((s) => ({ ...s, phase: "connecting", error: null }));
 
@@ -79,22 +86,9 @@ export default function useDuelSocket(roomCode, onConnect) {
       return;
     }
     wsRef.current = ws;
-
-    // Timeout: if no "joined" or "host_connected" event within 8 seconds,
-    // show error instead of endless "Verbinde..."
-    connectTimeoutRef.current = setTimeout(() => {
-      if (ws.readyState !== WebSocket.OPEN) {
-        setGameState((s) => ({
-          ...s,
-          phase: "error",
-          error: "Verbindung zum Server fehlgeschlagen. Bitte prüfe die Netzwerkverbindung.",
-        }));
-        try { ws.close(); } catch {}
-      }
-    }, 8000);
+    closedIntentionallyRef.current = false;
 
     ws.onopen = () => {
-      reconnectCountRef.current = 0;
       setGameState((s) => ({ ...s, phase: "connected", error: null }));
 
       // Start ping keepalive
@@ -107,9 +101,8 @@ export default function useDuelSocket(roomCode, onConnect) {
         onConnectRef.current(ws);
       }
 
-      // Safety timeout: if still on "connected" after 5s, something went wrong
-      // (server didn't respond with "joined" or "host_connected")
-      setTimeout(() => {
+      // Safety timeout: if still on "connected" after 6s, server didn't respond
+      joinTimeoutRef.current = setTimeout(() => {
         setGameState((prev) => {
           if (prev.phase === "connected") {
             return {
@@ -120,7 +113,7 @@ export default function useDuelSocket(roomCode, onConnect) {
           }
           return prev;
         });
-      }, 5000);
+      }, 6000);
     };
 
     ws.onmessage = (evt) => {
@@ -132,8 +125,11 @@ export default function useDuelSocket(roomCode, onConnect) {
       }
       const { event, data } = msg;
 
-      // Clear connect timeout on first meaningful event
-      clearTimeout(connectTimeoutRef.current);
+      // Clear join timeout on first meaningful response
+      if (event !== "pong") {
+        clearTimeout(joinTimeoutRef.current);
+        joinTimeoutRef.current = null;
+      }
 
       setGameState((prev) => {
         switch (event) {
@@ -246,17 +242,21 @@ export default function useDuelSocket(roomCode, onConnect) {
     };
 
     ws.onclose = () => {
-      clearInterval(pingRef.current);
-      clearTimeout(connectTimeoutRef.current);
+      cleanup();
+      // Ignore close if we intentionally closed (during reconnect)
+      if (closedIntentionallyRef.current) {
+        closedIntentionallyRef.current = false;
+        return;
+      }
       setGameState((s) => {
-        // Don't override game_over phase with disconnected
+        // Don't override game_over with disconnected
         if (s.phase === "game_over") return s;
         return { ...s, phase: "disconnected" };
       });
     };
 
     ws.onerror = () => {
-      clearTimeout(connectTimeoutRef.current);
+      cleanup();
       setGameState((s) => ({
         ...s,
         phase: "error",
@@ -265,14 +265,15 @@ export default function useDuelSocket(roomCode, onConnect) {
     };
   }, [roomCode]);
 
-  // Initial connection
+  // Initial connection + cleanup on unmount
   useEffect(() => {
     connect();
     return () => {
-      clearInterval(pingRef.current);
-      clearTimeout(connectTimeoutRef.current);
+      cleanup();
+      closedIntentionallyRef.current = true;
       if (wsRef.current) {
         try { wsRef.current.close(); } catch {}
+        wsRef.current = null;
       }
     };
   }, [connect]);
