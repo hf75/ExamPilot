@@ -115,6 +115,14 @@ async def add_task_to_exam(
     db: aiosqlite.Connection = Depends(get_db),
     _: bool = Depends(require_teacher),
 ):
+    # Block changes on active/closed exams
+    cursor = await db.execute("SELECT status FROM exams WHERE id = ?", (exam_id,))
+    exam_row = await cursor.fetchone()
+    if not exam_row:
+        raise HTTPException(status_code=404, detail="Klassenarbeit nicht gefunden")
+    if exam_row[0] != "draft":
+        raise HTTPException(status_code=400, detail="Aufgaben können nur im Entwurfsmodus geändert werden")
+
     task_id = body.get("task_id")
     if not task_id:
         raise HTTPException(status_code=400, detail="task_id erforderlich")
@@ -141,6 +149,12 @@ async def remove_task_from_exam(
     db: aiosqlite.Connection = Depends(get_db),
     _: bool = Depends(require_teacher),
 ):
+    # Block changes on active/closed exams
+    cursor = await db.execute("SELECT status FROM exams WHERE id = ?", (exam_id,))
+    exam_row = await cursor.fetchone()
+    if exam_row and exam_row[0] != "draft":
+        raise HTTPException(status_code=400, detail="Aufgaben können nur im Entwurfsmodus geändert werden")
+
     await db.execute(
         "DELETE FROM exam_tasks WHERE exam_id = ? AND task_id = ?",
         (exam_id, task_id),

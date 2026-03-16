@@ -65,6 +65,12 @@ async def create_task(
     db: aiosqlite.Connection = Depends(get_db),
     _: bool = Depends(require_teacher),
 ):
+    # Validate pool_id exists
+    if task.pool_id is not None:
+        cursor = await db.execute("SELECT id FROM task_pools WHERE id = ?", (task.pool_id,))
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Ungültiger Pool")
+
     qdata_json = json.dumps(task.question_data or {}, ensure_ascii=False)
     cursor = await db.execute(
         """INSERT INTO tasks (title, text, hint, solution, topic, task_type, points, parent_task_id, source, question_data, pool_id)

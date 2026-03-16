@@ -13,7 +13,8 @@ def calculate_grade(points, max_points, scale=None):
         scale = IHK_GRADING_SCALE
     if max_points <= 0:
         return "6", "ungenügend", 0.0
-    percent = (points / max_points) * 100
+    clamped_points = max(0, min(points, max_points))
+    percent = (clamped_points / max_points) * 100
     for threshold, grade, label in scale:
         if percent >= threshold:
             return grade, label, round(percent, 1)

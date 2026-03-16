@@ -138,11 +138,18 @@ export default function Drawing({ task, questionData, answer, onChange, disabled
     onChange("");
   }
 
-  // Fix eraser visual: after erasing, fill white behind
-  // We handle this by drawing on a white background canvas
+  // Flush canvas export on unmount to ensure latest state is saved
   useEffect(() => {
     return () => {
       if (exportTimer.current) clearTimeout(exportTimer.current);
+      // Synchronous final export on unmount
+      const canvas = canvasRef.current;
+      if (canvas && !disabled) {
+        try {
+          const dataUrl = canvas.toDataURL("image/png");
+          onChange(dataUrl);
+        } catch {}
+      }
     };
   }, []);
 

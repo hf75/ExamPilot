@@ -128,6 +128,12 @@ def _grade_matching(qdata: dict, student_answer: str, max_points: int) -> dict:
         return {"points": 0, "correct": False, "feedback": "Keine Paare definiert."}
 
     selected = _parse_answer(student_answer)
+    if isinstance(selected, list):
+        # Convert list format [[0,1],[1,0]] to dict format {"0": val, "1": val}
+        try:
+            selected = {str(i): v for i, v in enumerate(selected)}
+        except (TypeError, ValueError):
+            return {"points": 0, "correct": False, "feedback": "Ungültiges Antwortformat."}
     if not isinstance(selected, dict):
         return {"points": 0, "correct": False, "feedback": "Ungültiges Antwortformat."}
 

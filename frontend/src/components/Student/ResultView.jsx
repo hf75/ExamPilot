@@ -232,6 +232,7 @@ export default function ResultView() {
                       value={disputeReason}
                       onChange={(e) => setDisputeReason(e.target.value)}
                       placeholder="z.B. Der Befehl ist korrekt, weil..."
+                      maxLength={500}
                     />
                   </div>
                   <div className="task-actions">

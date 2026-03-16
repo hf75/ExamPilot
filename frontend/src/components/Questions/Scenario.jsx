@@ -73,7 +73,7 @@ export default function Scenario({ task, questionData, answer, onChange, disable
   }
 
   async function handleChoice(optionIndex) {
-    if (loading || disabled || finished) return;
+    if (loading || disabled || finished || options.length === 0) return;
 
     const chosenText = options[optionIndex];
     const decisionEntry = { role: "decision", content: chosenText, chosen_index: optionIndex };

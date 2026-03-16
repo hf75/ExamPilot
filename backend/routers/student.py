@@ -1,11 +1,14 @@
 import json
 import asyncio
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 import aiosqlite
 
 from database import get_db
 from config import DB_PATH
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 from models import StudentJoinRequest, AnswerSubmit, AnswerDispute, HeartbeatRequest, ExplainRequest, FeynmanChatRequest, ScenarioNextRequest
 from services.claude_service import grade_answer, explain_answer, feynman_respond, scenario_respond
 from services.auto_grader import is_auto_gradable, grade_auto
@@ -86,7 +89,8 @@ async def get_session(
     session_id: int, db: aiosqlite.Connection = Depends(get_db)
 ):
     cursor = await db.execute(
-        """SELECT es.*, e.title as exam_title, e.duration_minutes, s.name as student_name
+        """SELECT es.*, e.title as exam_title, e.duration_minutes, e.status as exam_status,
+                  s.name as student_name
            FROM exam_sessions es
            JOIN exams e ON e.id = es.exam_id
            JOIN students s ON s.id = es.student_id
@@ -98,6 +102,10 @@ async def get_session(
         raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
 
     session_dict = dict(session)
+
+    # If exam was closed by teacher, mark session as submitted
+    if session_dict["exam_status"] != "active" and session_dict["status"] == "in_progress":
+        session_dict["status"] = "closed"
 
     # Get tasks for this exam
     cursor = await db.execute(
@@ -163,8 +171,8 @@ async def _grade_in_background(answer_id: int, task: dict, student_answer: str):
             question_data=question_data,
             solution=task.get("solution", ""),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Background grading failed for answer %s: %s", answer_id, e)
 
     # Write result back with a fresh DB connection
     async with aiosqlite.connect(str(DB_PATH)) as db:
@@ -475,12 +483,12 @@ async def scenario_next(req: ScenarioNextRequest, db: aiosqlite.Connection = Dep
     context = question_data.get("context", "")
     max_decisions = question_data.get("max_decisions", 5)
 
-    # Count decisions made
+    # Count decisions made (the current one is already in the transcript)
     decisions_made = len([e for e in req.transcript if e.get("role") == "decision"])
     if decisions_made > max_decisions:
         raise HTTPException(status_code=400, detail="Maximale Entscheidungen erreicht")
 
-    is_last_decision = decisions_made >= max_decisions - 1
+    is_last_decision = decisions_made >= max_decisions
 
     result = await scenario_respond(
         scenario_description=scenario_description,
@@ -654,10 +662,18 @@ async def get_results(
 async def heartbeat(req: HeartbeatRequest, db: aiosqlite.Connection = Depends(get_db)):
     """Track which task a student is currently on (for live dashboard)."""
     cursor = await db.execute(
-        "SELECT exam_id, status FROM exam_sessions WHERE id = ?", (req.session_id,)
+        "SELECT exam_id, student_id, status FROM exam_sessions WHERE id = ?", (req.session_id,)
     )
     session = await cursor.fetchone()
-    if not session or session[1] != "in_progress":
+    if not session or session[2] != "in_progress":
+        return {"ok": True}
+
+    # Validate that the task belongs to this exam
+    cursor = await db.execute(
+        "SELECT 1 FROM exam_tasks WHERE exam_id = ? AND task_id = ?",
+        (session[0], req.current_task_id),
+    )
+    if not await cursor.fetchone():
         return {"ok": True}
 
     _student_activity[req.session_id] = {

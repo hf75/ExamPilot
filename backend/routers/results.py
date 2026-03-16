@@ -212,6 +212,16 @@ async def adjust_answer(
         (total, session_id),
     )
 
+    # Invalidate cached class analysis since grades changed
+    cursor = await db.execute(
+        "SELECT exam_id FROM exam_sessions WHERE id = ?", (session_id,)
+    )
+    session_row = await cursor.fetchone()
+    if session_row:
+        await db.execute(
+            "DELETE FROM class_analyses WHERE exam_id = ?", (session_row[0],)
+        )
+
     await db.commit()
     return {"message": "Punkte angepasst", "new_total": total}
 

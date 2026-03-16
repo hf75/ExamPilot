@@ -15,7 +15,9 @@ export default function ExamView() {
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
+  const [saveErrors, setSaveErrors] = useState([]);
   const autoSaveTimer = useRef(null);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     loadSession();
@@ -32,7 +34,8 @@ export default function ExamView() {
       const remaining = Math.max(0, Math.floor((end - now) / 1000));
       setTimeLeft(remaining);
 
-      if (remaining <= 0) {
+      if (remaining <= 0 && !isSubmittingRef.current) {
+        isSubmittingRef.current = true;
         handleSubmitExam();
       }
     }
@@ -121,27 +124,48 @@ export default function ExamView() {
   }
 
   async function handleSubmitExam() {
+    if (submitting) return;
     setSubmitting(true);
+    isSubmittingRef.current = true;
     try {
       // Cancel any pending auto-save timer
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
-      // Save all pending answers
+      // Flush any pending drawing export by triggering canvas export
+      document.querySelectorAll(".drawing-canvas").forEach((canvas) => {
+        try {
+          const dataUrl = canvas.toDataURL("image/png");
+          const taskEl = canvas.closest("[data-task-id]");
+          if (taskEl) {
+            const tid = taskEl.dataset.taskId;
+            if (tid) answers[tid] = dataUrl;
+          }
+        } catch {}
+      });
+
+      // Save all pending answers, track failures
+      const failures = [];
       const savePromises = Object.entries(answers)
+        .filter(([, answer]) => answer && answer !== "" && answer !== "[]" && answer !== "{}")
         .map(([taskId, answer]) =>
           api.post("/api/student/answer", {
             session_id: parseInt(sessionId),
             task_id: parseInt(taskId),
             student_answer: answer,
-          }).catch(() => {})
+          }).catch((err) => { failures.push(taskId); })
         );
       await Promise.all(savePromises);
+
+      if (failures.length > 0) {
+        setSaveErrors(failures);
+      }
 
       // Submit — backend grades all AI tasks and calculates points
       await api.post(`/api/student/submit/${sessionId}`);
       navigate(`/results/${sessionId}`);
     } catch (err) {
       alert(err.message);
+      isSubmittingRef.current = false;
     } finally {
       setSubmitting(false);
     }
@@ -311,6 +335,12 @@ export default function ExamView() {
           }
         </div>
       </div>
+
+      {saveErrors.length > 0 && (
+        <div className="save-error-banner" style={{ background: "#fef2f2", color: "#b91c1c", padding: "8px 16px", borderRadius: 8, margin: "8px 16px", fontSize: 14 }}>
+          Warnung: {saveErrors.length} Antwort(en) konnten nicht gespeichert werden. Bitte versuche es erneut.
+        </div>
+      )}
 
       {showConfirm && (
         <div className="modal-overlay">

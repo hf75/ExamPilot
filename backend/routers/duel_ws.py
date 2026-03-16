@@ -1,12 +1,15 @@
 """WebSocket endpoint for Lern-Duelle."""
 
 import json
+import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from services.duel_engine import (
     get_room, add_player, remove_player, start_game,
     submit_answer, advance_round, send_to_host, serialize_lobby,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -79,7 +82,8 @@ async def duel_websocket(websocket: WebSocket, room_code: str):
             room.host_ws = None
         if player_id:
             await remove_player(room, player_id)
-    except Exception:
+    except Exception as e:
+        logger.error("Duel WebSocket error in room %s: %s", room_code, e, exc_info=True)
         if is_host:
             room.host_ws = None
         if player_id:

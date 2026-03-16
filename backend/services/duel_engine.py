@@ -377,9 +377,14 @@ async def submit_answer(room: GameRoom, player_id: str, answer: str):
 
 
 async def _reveal_answers(room: GameRoom):
+    # Guard against double-call race (timer + early-reveal can fire concurrently)
     if room.phase != "question":
         return
     room.phase = "reveal"
+    # Cancel timer if still running to prevent duplicate invocation
+    if room.timer_task and not room.timer_task.done():
+        room.timer_task.cancel()
+        room.timer_task = None
 
     task = room.tasks[room.current_round]
     correct_info = _get_correct_info(task)
