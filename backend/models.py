@@ -151,3 +151,10 @@ class ScenarioNextRequest(BaseModel):
     task_id: int
     transcript: list[dict]
     chosen_option: int | None = None
+
+
+class DuelCreateRequest(BaseModel):
+    mode: str = "duel"
+    pool_ids: list[int]
+    total_rounds: int = 5
+    timer_seconds: int = 20

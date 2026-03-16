@@ -19,6 +19,7 @@ export default function Dashboard() {
           <Link to="/teacher">Übersicht</Link>
           <Link to="/teacher/tasks">Aufgaben</Link>
           <Link to="/teacher/exams">Klassenarbeiten</Link>
+          <Link to="/teacher/duels">Lern-Duelle</Link>
           <button onClick={handleLogout} className="btn-logout">
             Abmelden
           </button>

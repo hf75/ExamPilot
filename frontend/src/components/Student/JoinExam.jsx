@@ -94,6 +94,8 @@ export default function JoinExam() {
         )}
 
         <div className="login-footer">
+          <a href="/duel">Zum Lern-Duell →</a>
+          <span style={{ margin: "0 8px", color: "#ccc" }}>|</span>
           <a href="/login">Lehrer-Login →</a>
         </div>
       </div>

@@ -12,6 +12,10 @@ import ExamPreview from "./components/Teacher/ExamPreview";
 import JoinExam from "./components/Student/JoinExam";
 import ExamView from "./components/Student/ExamView";
 import ResultView from "./components/Student/ResultView";
+import DuelJoin from "./components/Duel/DuelJoin";
+import DuelStudentGame from "./components/Duel/DuelStudentGame";
+import DuelTeacherSetup from "./components/Duel/DuelTeacherSetup";
+import DuelTeacherLive from "./components/Duel/DuelTeacherLive";
 
 function ProtectedRoute({ children }) {
   if (!isLoggedIn()) {
@@ -28,9 +32,19 @@ export default function App() {
         <Route path="/" element={<JoinExam />} />
         <Route path="/exam/:sessionId" element={<ExamView />} />
         <Route path="/results/:sessionId" element={<ResultView />} />
+        <Route path="/duel" element={<DuelJoin />} />
+        <Route path="/duel/play/:roomCode" element={<DuelStudentGame />} />
 
         {/* Teacher routes */}
         <Route path="/login" element={<Login />} />
+        <Route
+          path="/duel/live/:roomCode"
+          element={
+            <ProtectedRoute>
+              <DuelTeacherLive />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/teacher/exams/:examId/preview"
           element={
@@ -50,6 +64,7 @@ export default function App() {
           <Route index element={<Overview />} />
           <Route path="tasks" element={<TaskPool />} />
           <Route path="exams" element={<ExamBuilder />} />
+          <Route path="duels" element={<DuelTeacherSetup />} />
           <Route path="exams/:examId/monitor" element={<LiveMonitor />} />
           <Route path="exams/:examId/results" element={<Results />} />
           <Route path="exams/:examId/results/:sessionId" element={<StudentResult />} />
