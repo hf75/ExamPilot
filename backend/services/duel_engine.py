@@ -382,10 +382,12 @@ async def _reveal_answers(room: GameRoom):
     if room.phase != "question":
         return
     room.phase = "reveal"
-    # Cancel timer if still running to prevent duplicate invocation
-    if room.timer_task and not room.timer_task.done():
+    # Cancel timer if it's a separate task (early-reveal from submit_answer).
+    # Don't cancel if we ARE the timer task — that would CancelledError ourselves.
+    current_task = asyncio.current_task()
+    if room.timer_task and room.timer_task is not current_task and not room.timer_task.done():
         room.timer_task.cancel()
-        room.timer_task = None
+    room.timer_task = None
 
     task = room.tasks[room.current_round]
     correct_info = _get_correct_info(task)
