@@ -8,29 +8,43 @@ export default function DuelJoin() {
   const [code, setCode] = useState(prefilledCode.toUpperCase());
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [joining, setJoining] = useState(false);
   const navigate = useNavigate();
   const nameRef = useRef();
+  const codeRef = useRef();
 
-  // If code is pre-filled (from QR), auto-focus name field
+  // Focus the right field on mount
   useEffect(() => {
-    if (prefilledCode && nameRef.current) {
-      nameRef.current.focus();
-    }
+    // Small delay ensures mobile keyboard opens reliably
+    const timer = setTimeout(() => {
+      if (prefilledCode && nameRef.current) {
+        nameRef.current.focus();
+      } else if (codeRef.current) {
+        codeRef.current.focus();
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [prefilledCode]);
 
   async function handleJoin(e) {
     e.preventDefault();
+    if (joining) return;
+
     setError("");
     const roomCode = code.trim().toUpperCase();
-    if (!roomCode || !name.trim()) {
+    const playerName = name.trim();
+    if (!roomCode || !playerName) {
       setError("Bitte Code und Name eingeben");
       return;
     }
+
+    setJoining(true);
     try {
       await api.get(`/api/duels/room/${roomCode}`);
-      navigate(`/duel/play/${roomCode}?name=${encodeURIComponent(name.trim())}`);
+      navigate(`/duel/play/${roomCode}?name=${encodeURIComponent(playerName)}`);
     } catch {
       setError("Raum nicht gefunden");
+      setJoining(false);
     }
   }
 
@@ -53,13 +67,14 @@ export default function DuelJoin() {
             </div>
           ) : (
             <input
+              ref={codeRef}
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="RAUM-CODE"
               className="duel-code-input"
               maxLength={6}
-              autoFocus
+              disabled={joining}
             />
           )}
           <input
@@ -69,10 +84,15 @@ export default function DuelJoin() {
             onChange={(e) => setName(e.target.value)}
             placeholder="Dein Name"
             className="duel-name-input"
-            autoFocus={!!prefilledCode}
+            maxLength={30}
+            disabled={joining}
           />
-          <button type="submit" className="duel-btn duel-btn-join">
-            Beitreten
+          <button
+            type="submit"
+            className="duel-btn duel-btn-join"
+            disabled={joining}
+          >
+            {joining ? "Verbinde..." : "Beitreten"}
           </button>
         </form>
 
