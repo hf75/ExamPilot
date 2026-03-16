@@ -13,14 +13,13 @@ export default function DuelStudentGame() {
   const [searchParams] = useSearchParams();
   const playerName = searchParams.get("name") || "";
 
-  // Send join directly in WebSocket onopen — bypasses React render cycle
   const handleConnect = useCallback((ws) => {
     if (playerName) {
       ws.send(JSON.stringify({ action: "join", name: playerName }));
     }
   }, [playerName]);
 
-  const { gameState, send, setAnswered } = useDuelSocket(roomCode, handleConnect);
+  const { gameState, send, setAnswered, reconnect } = useDuelSocket(roomCode, handleConnect);
 
   function handleAnswer(answer) {
     send("answer", { answer });
@@ -31,17 +30,47 @@ export default function DuelStudentGame() {
 
   return (
     <div className="duel-root duel-student-view">
-      {(phase === "connecting" || phase === "connected") && (
-        <div className="duel-center-message">Verbinde...</div>
-      )}
-
-      {phase === "disconnected" && (
-        <div className="duel-center-message duel-error">
-          Verbindung verloren. <a href={`/duel/play/${roomCode}?name=${encodeURIComponent(playerName)}`}>Neu verbinden</a>
+      {phase === "connecting" && (
+        <div className="duel-center-message">
+          <span className="duel-spinner" />
+          Verbinde mit Raum...
         </div>
       )}
 
-      {gameState.error && (
+      {phase === "connected" && (
+        <div className="duel-center-message">
+          <span className="duel-spinner" />
+          Trete bei...
+        </div>
+      )}
+
+      {phase === "error" && (
+        <div className="duel-center-message duel-error-box">
+          <div className="duel-error-icon">!</div>
+          <p>{gameState.error || "Verbindungsfehler"}</p>
+          <button className="duel-btn duel-btn-join" onClick={reconnect} style={{ marginTop: 16 }}>
+            Erneut verbinden
+          </button>
+          <a href="/duel" style={{ marginTop: 12, display: "inline-block", color: "#aaa" }}>
+            Zurück
+          </a>
+        </div>
+      )}
+
+      {phase === "disconnected" && (
+        <div className="duel-center-message duel-error-box">
+          <div className="duel-error-icon">!</div>
+          <p>Verbindung verloren</p>
+          <button className="duel-btn duel-btn-join" onClick={reconnect} style={{ marginTop: 16 }}>
+            Neu verbinden
+          </button>
+          <a href="/duel" style={{ marginTop: 12, display: "inline-block", color: "#aaa" }}>
+            Zurück
+          </a>
+        </div>
+      )}
+
+      {gameState.error && phase !== "error" && phase !== "disconnected" && (
         <div className="duel-error-toast">{gameState.error}</div>
       )}
 
@@ -67,26 +96,31 @@ export default function DuelStudentGame() {
               Runde {gameState.round}/{gameState.totalRounds}
             </span>
           </div>
-          <DuelQuestion
-            question={gameState.currentQuestion}
-            timerSeconds={gameState.timerSeconds}
-            onAnswer={handleAnswer}
-            answered={gameState.answered}
-          />
+          {gameState.myAlive ? (
+            <DuelQuestion
+              question={gameState.currentQuestion}
+              timerSeconds={gameState.timerSeconds}
+              onAnswer={handleAnswer}
+              answered={gameState.answered}
+            />
+          ) : (
+            <div className="duel-eliminated-spectator">
+              <div className="duel-eliminated-badge">Eliminiert</div>
+              <p>Du schaust den anderen zu.</p>
+            </div>
+          )}
         </div>
       )}
 
       {phase === "reveal" && (
         <div className="duel-reveal">
           <div className="duel-reveal-header">
-            {gameState.playerResults.find((p) => p.id === gameState.myPlayerId)?.correct ? (
+            {!gameState.myAlive && gameState.mode === "royale" ? (
+              <div className="duel-reveal-wrong">Eliminiert!</div>
+            ) : gameState.playerResults.find((p) => p.id === gameState.myPlayerId)?.correct ? (
               <div className="duel-reveal-correct">Richtig!</div>
             ) : (
-              <div className="duel-reveal-wrong">
-                {!gameState.myAlive && gameState.mode === "royale"
-                  ? "Eliminiert!"
-                  : "Falsch!"}
-              </div>
+              <div className="duel-reveal-wrong">Falsch!</div>
             )}
           </div>
           <div className="duel-reveal-points">

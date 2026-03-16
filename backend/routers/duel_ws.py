@@ -20,8 +20,8 @@ async def duel_websocket(websocket: WebSocket, room_code: str):
 
     room = get_room(room_code)
     if not room:
-        await websocket.send_text(json.dumps({"event": "error", "data": {"message": "Raum nicht gefunden"}}))
-        await websocket.close()
+        await websocket.send_text(json.dumps({"event": "error", "data": {"message": "Raum nicht gefunden oder bereits geschlossen"}}))
+        await websocket.close(code=4004, reason="Room not found")
         return
 
     player_id = None

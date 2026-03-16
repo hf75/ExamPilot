@@ -19,23 +19,40 @@ export default function DuelTeacherLive() {
     ws.send(JSON.stringify({ action: "host_connect", token }));
   }, []);
 
-  const { gameState, send } = useDuelSocket(roomCode, handleConnect);
+  const { gameState, send, reconnect } = useDuelSocket(roomCode, handleConnect);
 
   const { phase } = gameState;
 
   return (
     <div className="duel-root duel-live-view">
       {(phase === "connecting" || phase === "connected") && (
-        <div className="duel-center-message">Verbinde mit Raum...</div>
-      )}
-
-      {phase === "disconnected" && (
-        <div className="duel-center-message duel-error">
-          Verbindung verloren. <a href={`/duel/live/${roomCode}`}>Neu verbinden</a>
+        <div className="duel-center-message">
+          <span className="duel-spinner" />
+          Verbinde mit Raum...
         </div>
       )}
 
-      {gameState.error && (
+      {phase === "error" && (
+        <div className="duel-center-message duel-error-box">
+          <div className="duel-error-icon">!</div>
+          <p>{gameState.error || "Verbindungsfehler"}</p>
+          <button className="duel-btn duel-btn-join" onClick={reconnect} style={{ marginTop: 16 }}>
+            Erneut verbinden
+          </button>
+        </div>
+      )}
+
+      {phase === "disconnected" && (
+        <div className="duel-center-message duel-error-box">
+          <div className="duel-error-icon">!</div>
+          <p>Verbindung verloren</p>
+          <button className="duel-btn duel-btn-join" onClick={reconnect} style={{ marginTop: 16 }}>
+            Neu verbinden
+          </button>
+        </div>
+      )}
+
+      {gameState.error && phase !== "error" && phase !== "disconnected" && (
         <div className="duel-error-toast">{gameState.error}</div>
       )}
 

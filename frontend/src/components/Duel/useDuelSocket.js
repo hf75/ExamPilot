@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-const WS_BASE = (import.meta.env.VITE_API_URL || "")
-  .replace(/^http/, "ws") || `ws://${window.location.host}`;
+function getWsBase() {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl) {
+    return apiUrl.replace(/^http/, "ws");
+  }
+  // In production, backend serves frontend — use same host
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${window.location.host}`;
+}
 
 export default function useDuelSocket(roomCode, onConnect) {
   const [gameState, setGameState] = useState({
@@ -30,12 +37,15 @@ export default function useDuelSocket(roomCode, onConnect) {
 
   const wsRef = useRef(null);
   const pingRef = useRef(null);
+  const connectTimeoutRef = useRef(null);
   const onConnectRef = useRef(onConnect);
+  const reconnectCountRef = useRef(0);
   onConnectRef.current = onConnect;
 
   const send = useCallback((action, data = {}) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action, ...data }));
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ action, ...data }));
     }
   }, []);
 
@@ -43,21 +53,74 @@ export default function useDuelSocket(roomCode, onConnect) {
     setGameState((s) => ({ ...s, answered: true }));
   }, []);
 
-  useEffect(() => {
+  // Reconnect function — can be called manually or on close
+  const connect = useCallback(() => {
     if (!roomCode) return;
 
-    const ws = new WebSocket(`${WS_BASE}/ws/duel/${roomCode}`);
+    // Clean up previous connection
+    if (wsRef.current) {
+      try { wsRef.current.close(); } catch {}
+    }
+    clearInterval(pingRef.current);
+    clearTimeout(connectTimeoutRef.current);
+
+    setGameState((s) => ({ ...s, phase: "connecting", error: null }));
+
+    const wsBase = getWsBase();
+    let ws;
+    try {
+      ws = new WebSocket(`${wsBase}/ws/duel/${roomCode}`);
+    } catch (e) {
+      setGameState((s) => ({
+        ...s,
+        phase: "error",
+        error: `WebSocket-Verbindung fehlgeschlagen: ${e.message}`,
+      }));
+      return;
+    }
     wsRef.current = ws;
 
+    // Timeout: if no "joined" or "host_connected" event within 8 seconds,
+    // show error instead of endless "Verbinde..."
+    connectTimeoutRef.current = setTimeout(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        setGameState((s) => ({
+          ...s,
+          phase: "error",
+          error: "Verbindung zum Server fehlgeschlagen. Bitte prüfe die Netzwerkverbindung.",
+        }));
+        try { ws.close(); } catch {}
+      }
+    }, 8000);
+
     ws.onopen = () => {
+      reconnectCountRef.current = 0;
       setGameState((s) => ({ ...s, phase: "connected", error: null }));
+
+      // Start ping keepalive
       pingRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send("ping");
       }, 25000);
-      // Fire callback directly in onopen — bypasses React render cycle
+
+      // Fire connect callback (sends join or host_connect)
       if (onConnectRef.current) {
         onConnectRef.current(ws);
       }
+
+      // Safety timeout: if still on "connected" after 5s, something went wrong
+      // (server didn't respond with "joined" or "host_connected")
+      setTimeout(() => {
+        setGameState((prev) => {
+          if (prev.phase === "connected") {
+            return {
+              ...prev,
+              phase: "error",
+              error: "Server antwortet nicht. Raum existiert möglicherweise nicht mehr.",
+            };
+          }
+          return prev;
+        });
+      }, 5000);
     };
 
     ws.onmessage = (evt) => {
@@ -68,6 +131,9 @@ export default function useDuelSocket(roomCode, onConnect) {
         return;
       }
       const { event, data } = msg;
+
+      // Clear connect timeout on first meaningful event
+      clearTimeout(connectTimeoutRef.current);
 
       setGameState((prev) => {
         switch (event) {
@@ -181,18 +247,35 @@ export default function useDuelSocket(roomCode, onConnect) {
 
     ws.onclose = () => {
       clearInterval(pingRef.current);
-      setGameState((s) => ({ ...s, phase: "disconnected" }));
+      clearTimeout(connectTimeoutRef.current);
+      setGameState((s) => {
+        // Don't override game_over phase with disconnected
+        if (s.phase === "game_over") return s;
+        return { ...s, phase: "disconnected" };
+      });
     };
 
     ws.onerror = () => {
-      setGameState((s) => ({ ...s, error: "Verbindungsfehler" }));
-    };
-
-    return () => {
-      clearInterval(pingRef.current);
-      ws.close();
+      clearTimeout(connectTimeoutRef.current);
+      setGameState((s) => ({
+        ...s,
+        phase: "error",
+        error: "Verbindungsfehler — Server nicht erreichbar.",
+      }));
     };
   }, [roomCode]);
 
-  return { gameState, send, setAnswered };
+  // Initial connection
+  useEffect(() => {
+    connect();
+    return () => {
+      clearInterval(pingRef.current);
+      clearTimeout(connectTimeoutRef.current);
+      if (wsRef.current) {
+        try { wsRef.current.close(); } catch {}
+      }
+    };
+  }, [connect]);
+
+  return { gameState, send, setAnswered, reconnect: connect };
 }
