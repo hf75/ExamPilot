@@ -3147,3 +3147,423 @@ a:hover {
 .class-analysis-content li {
   margin-bottom: 4px;
 }
+
+/* ===================================================================
+   PWA & Responsive / Tablet (iPad) Styles
+   =================================================================== */
+
+/* Active nav link indicator */
+.nav-active {
+  color: var(--accent) !important;
+  background: rgba(124, 58, 237, 0.08);
+  font-weight: 500;
+}
+
+/* Hamburger menu button — hidden on desktop */
+.nav-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.hamburger-line {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.hamburger-line.open:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.hamburger-line.open:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-line.open:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Nav overlay for mobile */
+.nav-overlay {
+  display: none;
+}
+
+/* Ensure minimum touch targets (44px) for all interactive elements */
+@media (pointer: coarse) {
+  button, .btn-small, .btn-primary-sm, .btn-secondary, .btn-logout,
+  .btn-correct, .btn-wrong, .btn-explain, .btn-dispute, .btn-dispute-outline,
+  .type-filter-chip, .scenario-option-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .nav-links a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .progress-matrix td, .progress-matrix th {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+/* ===================================================================
+   Tablet breakpoint (iPad portrait ~768px, landscape ~1024px)
+   =================================================================== */
+@media (max-width: 1024px) {
+  .dashboard-content {
+    padding: 20px 16px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .page-header-actions,
+  .header-actions {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .page-header-actions button,
+  .header-actions button {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  /* Results table: make it horizontally scrollable with sticky first column */
+  .results-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .results-table th:first-child,
+  .results-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--bg-card);
+    z-index: 1;
+  }
+
+  .results-table th:first-child {
+    background: var(--bg-secondary);
+  }
+
+  /* Live monitor matrix: horizontal scroll with sticky name column */
+  .progress-matrix-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -16px;
+    padding: 0 16px;
+  }
+
+  .matrix-name-col,
+  .matrix-name-cell {
+    position: sticky;
+    left: 0;
+    background: var(--bg-card);
+    z-index: 2;
+    min-width: 120px;
+  }
+
+  .progress-matrix thead .matrix-name-col {
+    background: var(--bg-secondary);
+  }
+
+  /* Form rows: stack on tablet */
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Grade actions: larger buttons */
+  .grade-actions {
+    flex-wrap: wrap;
+  }
+
+  .grade-actions button {
+    flex: 1;
+    min-width: 100px;
+  }
+
+  /* Exam cards: adjust spacing */
+  .exam-card {
+    padding: 16px;
+  }
+
+  .task-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Monitor stats: wrap */
+  .monitor-stats {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Student result: better touch for adjust form */
+  .adjust-form .form-row {
+    flex-direction: column;
+  }
+
+  .adjust-form .form-group {
+    max-width: none !important;
+  }
+
+  /* Exam detail: stack layout */
+  .exam-detail .pool-filter-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* ===================================================================
+   Mobile breakpoint (phones + small tablets in portrait)
+   =================================================================== */
+@media (max-width: 768px) {
+  /* Show hamburger, hide desktop nav links */
+  .nav-hamburger {
+    display: flex;
+  }
+
+  .nav-links {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 280px;
+    height: 100vh;
+    background: var(--bg-card);
+    flex-direction: column;
+    padding: 72px 20px 20px;
+    gap: 4px;
+    box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+    z-index: 1000;
+    overflow-y: auto;
+  }
+
+  .nav-links.nav-open {
+    display: flex;
+  }
+
+  .nav-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 999;
+  }
+
+  .nav-links a {
+    padding: 14px 16px;
+    font-size: 16px;
+    border-radius: var(--radius);
+  }
+
+  .btn-logout {
+    margin-top: 16px;
+    padding: 14px 16px;
+    font-size: 15px;
+    text-align: center;
+  }
+
+  .dashboard-nav {
+    padding: 10px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .dashboard-content {
+    padding: 16px 12px;
+  }
+
+  /* Page header */
+  .page-header h2 {
+    font-size: 18px;
+  }
+
+  /* Results table → card layout */
+  .results-table thead {
+    display: none;
+  }
+
+  .results-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .results-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    align-items: center;
+  }
+
+  .results-table tr:hover {
+    background: var(--bg-card);
+  }
+
+  .results-table td {
+    padding: 0;
+    border: none;
+  }
+
+  .results-table td:first-child {
+    font-weight: 600;
+    font-size: 15px;
+    width: 100%;
+    position: static;
+  }
+
+  .results-table td:nth-child(7) {
+    margin-left: auto;
+  }
+
+  .results-table td:nth-child(7) .btn-small {
+    min-height: 44px;
+    padding: 10px 20px;
+  }
+
+  /* Live monitor: compact matrix */
+  .progress-matrix th.matrix-task-col {
+    font-size: 11px;
+    padding: 4px 6px;
+  }
+
+  .progress-matrix td.matrix-cell {
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+
+  .monitor-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .monitor-header h2 {
+    font-size: 18px;
+  }
+
+  /* Monitor submitted cards: 1 column */
+  .monitor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Student result: full width answer cards */
+  .result-answer-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .grade-actions {
+    flex-direction: column;
+  }
+
+  .grade-actions button {
+    width: 100%;
+  }
+
+  /* Exam cards: action buttons wrap */
+  .exam-card .task-actions {
+    flex-direction: column;
+  }
+
+  .exam-card .task-actions button {
+    width: 100%;
+  }
+
+  /* Exam builder: stack header */
+  .page-header-actions {
+    flex-direction: column;
+  }
+
+  .page-header-actions button {
+    width: 100%;
+  }
+
+  /* Overview stats */
+  .overview .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Task pool: full-width */
+  .pool-layout {
+    flex-direction: column;
+  }
+
+  .pool-sidebar {
+    width: 100%;
+    min-width: auto;
+  }
+
+  /* ExamView: reduce padding for student exam on tablet */
+  .exam-header-bar {
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .exam-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .exam-body {
+    flex-direction: column;
+  }
+
+  .task-nav-sidebar {
+    width: 100%;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  /* Type filter chips: smaller */
+  .type-filter-grid {
+    gap: 6px;
+  }
+
+  .type-filter-chip {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+}
+
+/* Safe area insets for notched devices (iPads with home indicator) */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .dashboard-nav {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  .dashboard-content {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
