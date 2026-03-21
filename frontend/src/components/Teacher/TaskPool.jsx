@@ -17,6 +17,7 @@ const TASK_TYPES = {
   webapp: "Web-App",
   feynman: "Feynman-Erklärung",
   scenario: "Branching-Szenario",
+  coding: "Programmierung",
 };
 
 const GENERATABLE_TYPES = {
@@ -31,6 +32,7 @@ const GENERATABLE_TYPES = {
   webapp: "Web-App",
   feynman: "Feynman-Erklärung",
   scenario: "Branching-Szenario",
+  coding: "Programmierung",
 };
 
 function TaskTypeFilter({ selected, onChange }) {

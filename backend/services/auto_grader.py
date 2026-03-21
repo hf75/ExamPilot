@@ -4,7 +4,10 @@ import json
 import re
 
 
-def is_auto_gradable(task_type: str) -> bool:
+def is_auto_gradable(task_type: str, question_data: dict | None = None) -> bool:
+    if task_type == "coding":
+        lang = (question_data or {}).get("language", "")
+        return lang != "html"  # HTML/CSS needs AI grading
     return task_type in {"multichoice", "truefalse", "numerical", "matching", "ordering", "cloze"}
 
 
@@ -17,6 +20,7 @@ def grade_auto(task_type: str, question_data: dict, student_answer: str, max_poi
         "matching": _grade_matching,
         "ordering": _grade_ordering,
         "cloze": _grade_cloze,
+        "coding": _grade_coding,
     }
     grader = graders.get(task_type)
     if not grader:
@@ -298,3 +302,53 @@ def _is_gap_correct(gap: dict, student_answer) -> bool:
         except (ValueError, TypeError):
             pass
     return False
+
+
+def _grade_coding(qdata: dict, student_answer: str, max_points: int) -> dict:
+    """Grade coding tasks by validating test results submitted from the browser."""
+    parsed = _parse_answer(student_answer)
+    if not isinstance(parsed, dict):
+        return {"points": 0, "correct": False, "feedback": "Keine Antwort eingereicht."}
+
+    language = qdata.get("language", "javascript")
+
+    # HTML/CSS has no automated tests — should be graded by AI
+    if language == "html":
+        return {"points": 0, "correct": False, "feedback": "Manuelle Bewertung erforderlich."}
+
+    code = parsed.get("code", "")
+    if not code.strip():
+        return {"points": 0, "correct": False, "feedback": "Kein Code eingereicht."}
+
+    test_results = parsed.get("test_results", [])
+    test_cases = qdata.get("test_cases", [])
+
+    if language == "sql":
+        # SQL: compare submitted result against expected
+        sql_expected = qdata.get("sql_expected")
+        if sql_expected and test_results:
+            # test_results[0] contains {passed, actual_output}
+            passed = test_results[0].get("passed", False) if test_results else False
+            points = max_points if passed else 0
+            feedback = "SQL-Query liefert das erwartete Ergebnis." if passed else "SQL-Query liefert nicht das erwartete Ergebnis."
+            return {"points": points, "correct": passed, "feedback": feedback}
+        return {"points": 0, "correct": False, "feedback": "Keine Testergebnisse."}
+
+    # JS/Python/TypeScript: count passed test cases
+    if not test_cases:
+        return {"points": max_points if test_results else 0, "correct": True, "feedback": "Keine Testfaelle definiert."}
+
+    total = len(test_cases)
+    passed = sum(1 for tr in test_results if tr.get("passed", False))
+    fraction = passed / total if total > 0 else 0
+    points = round(max_points * fraction, 2)
+    correct = passed == total
+
+    if correct:
+        feedback = f"Alle {total} Tests bestanden!"
+    elif passed > 0:
+        feedback = f"{passed} von {total} Tests bestanden."
+    else:
+        feedback = "Kein Test bestanden."
+
+    return {"points": points, "correct": correct, "feedback": feedback}

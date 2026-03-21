@@ -15,6 +15,7 @@ const TASK_TYPES = {
   webapp: "Web-App",
   feynman: "Feynman-Erklärung",
   scenario: "Branching-Szenario",
+  coding: "Programmierung",
 };
 
 function getDefaultQuestionData(type) {
@@ -46,6 +47,16 @@ function getDefaultQuestionData(type) {
       return { concept: "", context: "", max_turns: 10, grader_info: "" };
     case "scenario":
       return { scenario_description: "", context: "", max_decisions: 5, grader_info: "" };
+    case "coding":
+      return {
+        language: "javascript",
+        starter_code: "",
+        test_cases: [{ input: "", expected_output: "", description: "Test 1" }],
+        hidden_tests: false,
+        sql_schema: "",
+        sql_expected: "",
+        grader_info: "",
+      };
     case "description":
       return {};
     default:
@@ -229,6 +240,9 @@ export default function TaskEditor({ task, poolId, onSave, onCancel }) {
           )}
           {form.task_type === "scenario" && (
             <ScenarioConfig qd={qd} onChange={updateQD} />
+          )}
+          {form.task_type === "coding" && (
+            <CodingConfig qd={qd} onChange={updateQD} />
           )}
         </div>
 
@@ -876,6 +890,140 @@ function ScenarioConfig({ qd, onChange }) {
           rows={3}
         />
       </div>
+    </div>
+  );
+}
+
+const CODING_LANGUAGES = {
+  javascript: "JavaScript",
+  python: "Python",
+  sql: "SQL",
+  html: "HTML/CSS",
+  typescript: "TypeScript",
+};
+
+function CodingConfig({ qd, onChange }) {
+  const lang = qd.language || "javascript";
+  const testCases = qd.test_cases || [];
+
+  function updateTest(idx, field, value) {
+    const next = [...testCases];
+    next[idx] = { ...next[idx], [field]: value };
+    onChange({ test_cases: next });
+  }
+
+  function addTest() {
+    onChange({ test_cases: [...testCases, { input: "", expected_output: "", description: `Test ${testCases.length + 1}` }] });
+  }
+
+  function removeTest(idx) {
+    onChange({ test_cases: testCases.filter((_, i) => i !== idx) });
+  }
+
+  return (
+    <div className="qd-section">
+      <h4>Programmierung-Konfiguration</h4>
+      <div className="form-group">
+        <label>Programmiersprache</label>
+        <select value={lang} onChange={(e) => onChange({ language: e.target.value })}>
+          {Object.entries(CODING_LANGUAGES).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="form-group">
+        <label>Startercode (wird dem Schueler vorgegeben)</label>
+        <textarea
+          value={qd.starter_code || ""}
+          onChange={(e) => onChange({ starter_code: e.target.value })}
+          placeholder={lang === "python" ? "def solve(n):\n    # Dein Code hier\n    pass" : lang === "sql" ? "SELECT * FROM ..." : "function solve(n) {\n  // Dein Code hier\n}"}
+          rows={6}
+          style={{ fontFamily: "Consolas, Monaco, 'Courier New', monospace", fontSize: 13, tabSize: 2 }}
+        />
+      </div>
+
+      {lang === "sql" ? (
+        <>
+          <div className="form-group">
+            <label>Datenbankschema (CREATE TABLE + INSERT Statements)</label>
+            <textarea
+              value={qd.sql_schema || ""}
+              onChange={(e) => onChange({ sql_schema: e.target.value })}
+              placeholder={"CREATE TABLE mitarbeiter (\n  id INTEGER PRIMARY KEY,\n  name TEXT,\n  gehalt REAL\n);\nINSERT INTO mitarbeiter VALUES (1, 'Mueller', 3500);"}
+              rows={6}
+              style={{ fontFamily: "Consolas, Monaco, 'Courier New', monospace", fontSize: 13 }}
+            />
+          </div>
+          <div className="form-group">
+            <label>Erwartetes Ergebnis (JSON: Array von Zeilen)</label>
+            <textarea
+              value={typeof qd.sql_expected === "string" ? qd.sql_expected : JSON.stringify(qd.sql_expected || [], null, 2)}
+              onChange={(e) => {
+                try { onChange({ sql_expected: JSON.parse(e.target.value) }); }
+                catch { onChange({ sql_expected: e.target.value }); }
+              }}
+              placeholder={'[["name", "gehalt"], ["Mueller", 3500]]'}
+              rows={4}
+              style={{ fontFamily: "Consolas, Monaco, 'Courier New', monospace", fontSize: 13 }}
+            />
+          </div>
+        </>
+      ) : lang === "html" ? (
+        <div className="form-group">
+          <label>Bewertungskriterien fuer die KI</label>
+          <textarea
+            value={qd.grader_info || ""}
+            onChange={(e) => onChange({ grader_info: e.target.value })}
+            placeholder="z.B. Die Seite soll ein Formular mit Name, E-Mail und Absenden-Button enthalten. CSS soll responsive sein."
+            rows={3}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="form-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={qd.hidden_tests || false}
+                onChange={(e) => onChange({ hidden_tests: e.target.checked })}
+              />
+              Tests verstecken (Schueler sieht nur Beschreibung, nicht Ein-/Ausgabe)
+            </label>
+          </div>
+          <h4 style={{ marginTop: 16 }}>Testfaelle</h4>
+          {testCases.map((tc, i) => (
+            <div key={i} className="qd-answer-row" style={{ alignItems: "flex-start" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                <input
+                  type="text"
+                  value={tc.description}
+                  onChange={(e) => updateTest(i, "description", e.target.value)}
+                  placeholder="Beschreibung"
+                />
+                <input
+                  type="text"
+                  value={tc.input}
+                  onChange={(e) => updateTest(i, "input", e.target.value)}
+                  placeholder={lang === "python" ? "solve(5)" : "solve(5)"}
+                  style={{ fontFamily: "monospace" }}
+                />
+                <input
+                  type="text"
+                  value={tc.expected_output}
+                  onChange={(e) => updateTest(i, "expected_output", e.target.value)}
+                  placeholder="Erwartete Ausgabe: 25"
+                  style={{ fontFamily: "monospace" }}
+                />
+              </div>
+              <button type="button" className="btn-small btn-danger" onClick={() => removeTest(i)}>x</button>
+            </div>
+          ))}
+          <button type="button" className="btn-small" onClick={addTest} style={{ marginTop: 8 }}>
+            + Testfall hinzufuegen
+          </button>
+        </>
+      )}
     </div>
   );
 }

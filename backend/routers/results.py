@@ -337,6 +337,129 @@ async def get_class_analysis(
     return {"analysis": analysis, "cached": False}
 
 
+@router.get("/{exam_id}/statistics")
+async def get_exam_statistics(
+    exam_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Comprehensive class statistics for an exam."""
+    cursor = await db.execute("SELECT * FROM exams WHERE id = ?", (exam_id,))
+    exam = await cursor.fetchone()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Klassenarbeit nicht gefunden")
+    exam = dict(exam)
+
+    # Parse custom grading scale
+    scale_json = exam.get("grading_scale")
+    custom_scale = None
+    if scale_json:
+        try:
+            custom_scale = parse_scale(json.loads(scale_json) if isinstance(scale_json, str) else scale_json)
+        except Exception:
+            pass
+
+    # Get all submitted/graded sessions
+    cursor = await db.execute(
+        """SELECT es.id as session_id, es.total_points, es.max_points,
+                  s.name as student_name
+           FROM exam_sessions es
+           JOIN students s ON s.id = es.student_id
+           WHERE es.exam_id = ? AND es.status IN ('submitted', 'graded')
+           ORDER BY s.name""",
+        (exam_id,),
+    )
+    sessions = [dict(row) for row in await cursor.fetchall()]
+
+    if not sessions:
+        return {"class_stats": None, "task_stats": []}
+
+    # Calculate grades and collect scores
+    scores = []
+    percents = []
+    grade_counts = {}
+    for s in sessions:
+        total = s["total_points"] or 0
+        max_pts = s["max_points"] or 1
+        grade, label, pct = calculate_grade(total, max_pts, custom_scale)
+        scores.append(total)
+        percents.append(pct)
+        grade_counts[grade] = grade_counts.get(grade, 0) + 1
+
+    # Ensure all grades 1-6 are present
+    for g in ["1", "2", "3", "4", "5", "6"]:
+        grade_counts.setdefault(g, 0)
+
+    n = len(scores)
+    sorted_scores = sorted(scores)
+    sorted_pct = sorted(percents)
+    avg_percent = sum(percents) / n
+    median_percent = sorted_pct[n // 2] if n % 2 == 1 else (sorted_pct[n // 2 - 1] + sorted_pct[n // 2]) / 2
+    pass_count = sum(1 for p in percents if p >= 45)  # Note 4 or better (IHK default)
+
+    # Score distribution bins (in percent)
+    bins = [
+        {"bin": "0-20%", "min": 0, "max": 20, "count": 0},
+        {"bin": "21-40%", "min": 21, "max": 40, "count": 0},
+        {"bin": "41-60%", "min": 41, "max": 60, "count": 0},
+        {"bin": "61-80%", "min": 61, "max": 80, "count": 0},
+        {"bin": "81-100%", "min": 81, "max": 100, "count": 0},
+    ]
+    for p in percents:
+        for b in bins:
+            if b["min"] <= p <= b["max"]:
+                b["count"] += 1
+                break
+
+    class_stats = {
+        "student_count": n,
+        "average_percent": round(avg_percent, 1),
+        "median_percent": round(median_percent, 1),
+        "min_percent": round(min(percents), 1),
+        "max_percent": round(max(percents), 1),
+        "pass_rate": round((pass_count / n) * 100, 1),
+        "grade_distribution": grade_counts,
+        "score_distribution": [{"bin": b["bin"], "count": b["count"]} for b in bins],
+    }
+
+    # Task-level statistics
+    cursor = await db.execute(
+        """SELECT t.id as task_id, t.title, t.task_type, t.points as max_points,
+                  COUNT(a.id) as answer_count,
+                  AVG(COALESCE(a.points_awarded, 0)) as avg_points,
+                  SUM(CASE WHEN a.points_awarded >= t.points THEN 1 ELSE 0 END) as full_marks_count,
+                  SUM(CASE WHEN a.points_awarded = 0 OR a.points_awarded IS NULL THEN 1 ELSE 0 END) as zero_count
+           FROM exam_tasks et
+           JOIN tasks t ON t.id = et.task_id
+           LEFT JOIN answers a ON a.task_id = t.id
+               AND a.session_id IN (
+                   SELECT id FROM exam_sessions WHERE exam_id = ? AND status IN ('submitted', 'graded')
+               )
+           WHERE et.exam_id = ?
+           GROUP BY t.id, t.title, t.task_type, t.points
+           ORDER BY et.position""",
+        (exam_id, exam_id),
+    )
+    task_stats = []
+    for row in await cursor.fetchall():
+        r = dict(row)
+        ac = r["answer_count"] or 1
+        success_rate = ((r["avg_points"] or 0) / r["max_points"]) * 100 if r["max_points"] > 0 else 0
+        task_stats.append({
+            "task_id": r["task_id"],
+            "title": r["title"],
+            "task_type": r["task_type"],
+            "max_points": r["max_points"],
+            "avg_points": round(r["avg_points"] or 0, 1),
+            "success_rate": round(success_rate, 1),
+            "full_marks_count": r["full_marks_count"] or 0,
+            "zero_count": r["zero_count"] or 0,
+            "answer_count": r["answer_count"] or 0,
+        })
+
+    return {"class_stats": class_stats, "task_stats": task_stats}
+
+
 @router.delete("/{exam_id}/class-analysis")
 async def delete_class_analysis(
     exam_id: int,

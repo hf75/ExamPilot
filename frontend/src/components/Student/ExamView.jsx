@@ -253,7 +253,7 @@ export default function ExamView() {
           onToggleFlag={toggleFlag}
         />
 
-        <div className={`exam-main ${currentTask?.task_type === "drawing" || currentTask?.task_type === "webapp" || currentTask?.task_type === "feynman" || currentTask?.task_type === "scenario" ? "exam-main-drawing" : ""}`}>
+        <div className={`exam-main ${currentTask?.task_type === "drawing" || currentTask?.task_type === "webapp" || currentTask?.task_type === "feynman" || currentTask?.task_type === "scenario" || currentTask?.task_type === "coding" ? "exam-main-drawing" : ""}`}>
           {currentTask && (currentTask.task_type === "drawing" || currentTask.task_type === "webapp" || currentTask.task_type === "feynman" || currentTask.task_type === "scenario") ? (
                 <div className="drawing-split-layout">
                   <div className="drawing-split-left">

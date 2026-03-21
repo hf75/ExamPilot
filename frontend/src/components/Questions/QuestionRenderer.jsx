@@ -11,6 +11,7 @@ import Drawing from "./Drawing";
 import WebApp from "./WebApp";
 import Feynman from "./Feynman";
 import Scenario from "./Scenario";
+import Coding from "./Coding";
 
 const COMPONENTS = {
   multichoice: MultiChoice,
@@ -26,6 +27,7 @@ const COMPONENTS = {
   webapp: WebApp,
   feynman: Feynman,
   scenario: Scenario,
+  coding: Coding,
 };
 
 export default function QuestionRenderer({ task, answer, onChange, disabled, sessionId }) {

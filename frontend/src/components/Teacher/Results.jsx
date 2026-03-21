@@ -3,6 +3,23 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import Markdown from "../Markdown";
 
+const TASK_TYPES = {
+  multichoice: "MC",
+  truefalse: "W/F",
+  shortanswer: "Kurz",
+  numerical: "Num",
+  matching: "Zuord.",
+  ordering: "Reih.",
+  cloze: "Luecke",
+  essay: "Freitext",
+  drawing: "Zeichn.",
+  description: "Beschr.",
+  webapp: "WebApp",
+  feynman: "Feynman",
+  scenario: "Szenario",
+  coding: "Code",
+};
+
 export default function Results() {
   const { examId } = useParams();
   const navigate = useNavigate();
@@ -12,6 +29,9 @@ export default function Results() {
   const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   useEffect(() => {
     loadResults();
@@ -27,6 +47,20 @@ export default function Results() {
       navigate("/teacher/exams");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleShowStats() {
+    setShowStats(true);
+    if (stats) return;
+    setStatsLoading(true);
+    try {
+      const data = await api.get(`/api/exams/${examId}/statistics`);
+      setStats(data);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setStatsLoading(false);
     }
   }
 
@@ -78,7 +112,7 @@ export default function Results() {
   return (
     <div className="results-page">
       <button className="btn-secondary" onClick={() => navigate("/teacher/exams")}>
-        &larr; Zurück
+        &larr; Zurueck
       </button>
 
       <div className="page-header" style={{ marginTop: 16 }}>
@@ -89,8 +123,11 @@ export default function Results() {
           )}
         </div>
         <div className="header-actions">
+          <button className="btn-secondary" onClick={handleShowStats}>
+            Statistiken
+          </button>
           <button className="btn-secondary" onClick={handleClassAnalysis}>
-            Klassen-Analyse
+            KI-Analyse
           </button>
           <button className="btn-secondary" onClick={handleExportCsv}>
             CSV exportieren
@@ -101,6 +138,14 @@ export default function Results() {
         </div>
       </div>
 
+      {showStats && (
+        <ClassStatistics
+          stats={stats}
+          loading={statsLoading}
+          onClose={() => setShowStats(false)}
+        />
+      )}
+
       <table className="results-table">
         <thead>
           <tr>
@@ -109,7 +154,7 @@ export default function Results() {
             <th>Prozent</th>
             <th>Note</th>
             <th>Status</th>
-            <th>Einsprüche</th>
+            <th>Einsprueche</th>
             <th>Aktionen</th>
           </tr>
         </thead>
@@ -149,7 +194,7 @@ export default function Results() {
                     navigate(`/teacher/exams/${examId}/results/${s.session_id}`)
                   }
                 >
-                  {s.dispute_count > 0 ? "Prüfen" : "Details"}
+                  {s.dispute_count > 0 ? "Pruefen" : "Details"}
                 </button>
               </td>
             </tr>
@@ -160,7 +205,7 @@ export default function Results() {
       {showAnalysis && (
         <div className="class-analysis-panel">
           <div className="class-analysis-header">
-            <h3>Klassen-Schwächenanalyse</h3>
+            <h3>Klassen-Schwaechenanalyse</h3>
             <div style={{ display: "flex", gap: 8 }}>
               {analysis && (
                 <button
@@ -172,7 +217,7 @@ export default function Results() {
                 </button>
               )}
               <button className="btn-small" onClick={() => setShowAnalysis(false)}>
-                Schließen
+                Schliessen
               </button>
             </div>
           </div>
@@ -191,6 +236,154 @@ export default function Results() {
 
       {sessions.length === 0 && (
         <p className="empty-state">Noch keine Ergebnisse.</p>
+      )}
+    </div>
+  );
+}
+
+
+function ClassStatistics({ stats, loading, onClose }) {
+  if (loading) {
+    return (
+      <div className="stats-panel">
+        <div className="stats-header">
+          <h3>Klassenstatistiken</h3>
+          <button className="btn-small" onClick={onClose}>Schliessen</button>
+        </div>
+        <div className="class-analysis-loading">
+          <span className="grading-spinner"></span>
+          Statistiken werden berechnet...
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats?.class_stats) {
+    return (
+      <div className="stats-panel">
+        <div className="stats-header">
+          <h3>Klassenstatistiken</h3>
+          <button className="btn-small" onClick={onClose}>Schliessen</button>
+        </div>
+        <p className="empty-state">Keine abgegebenen Arbeiten vorhanden.</p>
+      </div>
+    );
+  }
+
+  const { class_stats, task_stats } = stats;
+  const gd = class_stats.grade_distribution;
+  const maxGradeCount = Math.max(...Object.values(gd), 1);
+  const totalStudents = class_stats.student_count;
+
+  const sortedByDifficulty = [...task_stats].sort((a, b) => a.success_rate - b.success_rate);
+
+  return (
+    <div className="stats-panel">
+      <div className="stats-header">
+        <h3>Klassenstatistiken</h3>
+        <button className="btn-small" onClick={onClose}>Schliessen</button>
+      </div>
+
+      {/* Key Metrics */}
+      <div className="stats-metrics">
+        <div className="stat-card">
+          <span className="stat-value">{totalStudents}</span>
+          <span className="stat-label">Teilnehmer</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-value">{class_stats.average_percent}%</span>
+          <span className="stat-label">Durchschnitt</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-value">{class_stats.median_percent}%</span>
+          <span className="stat-label">Median</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-value">{class_stats.pass_rate}%</span>
+          <span className="stat-label">Bestanden</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-value">{class_stats.max_percent}%</span>
+          <span className="stat-label">Bestes</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-value">{class_stats.min_percent}%</span>
+          <span className="stat-label">Schwächstes</span>
+        </div>
+      </div>
+
+      <div className="stats-charts-row">
+        {/* Grade Distribution */}
+        <div className="stats-chart-block">
+          <h4>Notenspiegel</h4>
+          <div className="grade-chart">
+            {["1", "2", "3", "4", "5", "6"].map((g) => (
+              <div key={g} className="grade-bar-group">
+                <span className="grade-bar-count">{gd[g] || 0}</span>
+                <div className="grade-bar-track">
+                  <div
+                    className={`grade-bar grade-bar-${g}`}
+                    style={{ height: `${((gd[g] || 0) / maxGradeCount) * 100}%` }}
+                  />
+                </div>
+                <span className="grade-bar-label">{g}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Score Distribution */}
+        <div className="stats-chart-block">
+          <h4>Punkteverteilung</h4>
+          <div className="score-chart">
+            {class_stats.score_distribution.map((bin) => {
+              const maxBin = Math.max(...class_stats.score_distribution.map(b => b.count), 1);
+              return (
+                <div key={bin.bin} className="score-bar-group">
+                  <span className="score-bar-count">{bin.count}</span>
+                  <div className="score-bar-track">
+                    <div
+                      className="score-bar"
+                      style={{ height: `${(bin.count / maxBin) * 100}%` }}
+                    />
+                  </div>
+                  <span className="score-bar-label">{bin.bin}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Task Difficulty Ranking */}
+      {task_stats.length > 0 && (
+        <div className="stats-tasks-block">
+          <h4>Aufgaben nach Schwierigkeit</h4>
+          <div className="stats-task-list">
+            {sortedByDifficulty.map((t) => (
+              <div key={t.task_id} className="stats-task-row">
+                <div className="stats-task-info">
+                  <span className="stats-task-title">{t.title}</span>
+                  <span className="stats-task-type">{TASK_TYPES[t.task_type] || t.task_type}</span>
+                </div>
+                <div className="stats-task-bar-wrap">
+                  <div className="stats-task-bar-track">
+                    <div
+                      className={`stats-task-bar ${t.success_rate >= 70 ? "easy" : t.success_rate >= 40 ? "medium" : "hard"}`}
+                      style={{ width: `${t.success_rate}%` }}
+                    />
+                  </div>
+                  <span className="stats-task-pct">{t.success_rate}%</span>
+                </div>
+                <div className="stats-task-detail">
+                  <span title="Durchschnittlich erreichte Punkte">{t.avg_points}/{t.max_points} Pkt.</span>
+                  <span title="Volle Punktzahl erreicht" className="stats-tag good">{t.full_marks_count}x voll</span>
+                  <span title="Null Punkte" className="stats-tag bad">{t.zero_count}x null</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -5,7 +5,7 @@ from datetime import datetime
 VALID_TASK_TYPES = {
     "multichoice", "truefalse", "shortanswer", "numerical",
     "matching", "ordering", "cloze", "essay", "description",
-    "drawing", "webapp", "feynman", "scenario",
+    "drawing", "webapp", "feynman", "scenario", "coding",
 }
 
 
