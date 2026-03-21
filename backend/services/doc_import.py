@@ -118,27 +118,34 @@ Wähle den Aufgabentyp basierend auf dem Inhalt:
 WICHTIG für den Aufgabentext:
 - Formuliere die Aufgaben in klarem, eigenständigem Deutsch
 - Übernimm KEINE Formatierungsartefakte aus dem Quelldokument (z.B. Dateinamen wie "verzeichnisliste.txt", HTML/Markdown-Tags, Code-Blöcke die nur Formatierung sind)
-- Wenn das Dokument auf Dateien, Bilder oder externe Ressourcen verweist, beschreibe den relevanten Inhalt direkt im Aufgabentext statt auf die Datei zu verweisen
 - Der Aufgabentext muss für sich allein verständlich sein, ohne das Quelldokument
 
 Antworte als JSON-Array:
 [
   {{
     "title": "Aufgabentitel",
-    "text": "Aufgabentext",
-    "hint": "Optionaler Hinweis für den Schüler während der Prüfung",
-    "solution": "Ausführliche Musterlösung — diese wird nach der Prüfung angezeigt und zur Bewertung genutzt",
+    "text": "Aufgabentext (Markdown)",
+    "hint": "Optionaler Hinweis",
+    "solution": "Ausführliche Musterlösung",
     "topic": "Themengebiet",
     "task_type": "...",
     "points": 1-5,
-    "question_data": {{ ... }}
+    "question_data": {{ ... }},
+    "images": ["img_1"]
   }}
 ]
+
+BILDER AUS DEM DOKUMENT: Jedes Bild im Dokument hat eine ID (img_1, img_2, ...).
+Du kannst Bilder in Aufgaben einbinden, indem du die ID im "images"-Array der Aufgabe auflistest.
+Die Bilder werden dann automatisch im Aufgabentext angezeigt.
+- Verwende Originalbilder für: Fotos, Screenshots, handgezeichnete Skizzen, Abbildungen die man nicht als Text/Diagramm nachbauen kann
+- Verwende STATTDESSEN Mermaid-Diagramme für: ER-Diagramme, Flowcharts, UML, Netzwerk-Topologien (sauberer, editierbar)
+- Du kannst auch beides kombinieren: Ein Foto als Bild + ein Mermaid-Diagramm in derselben Aufgabe
+- Wenn du ein Bild einbindest, schreibe im text-Feld an der gewünschten Stelle: {{{{img_1}}}} (wird durch das Bild ersetzt)
 
 DIAGRAMME: Du kannst im Aufgabentext Mermaid-Diagramme verwenden! Sie werden automatisch gerendert.
 Nutze ```mermaid Code-Blöcke für: ER-Diagramme, Flowcharts, Sequenzdiagramme, Klassendiagramme, Zustandsdiagramme.
 Beispiel: "Beschreibe das folgende ER-Diagramm:\\n\\n```mermaid\\nerDiagram\\n    KUNDE ||--o{{ BESTELLUNG : bestellt\\n```"
-Verwende Diagramme wenn sie zum Thema passen — besonders bei Datenbanken, Netzwerken, Softwareentwicklung, Prozessen.
 
 WICHTIG: Jede Aufgabe MUSS eine ausführliche "solution" (Musterlösung) enthalten.
 - Bei Multiple Choice: Erkläre warum die richtige Antwort korrekt ist
@@ -152,8 +159,8 @@ Antworte IMMER als valides JSON-Array. Keine zusätzliche Erklärung.
 WICHTIG: Achte auf korrektes JSON-Escaping! Anführungszeichen innerhalb von String-Werten MÜSSEN escaped werden (\\"). Verwende keine unescapten " innerhalb von JSON-Strings."""
 
 
-async def _post_process_tasks(tasks: list) -> None:
-    """Validate tasks and generate app_html for any webapp tasks."""
+async def _post_process_tasks(tasks: list, image_map: dict[str, str] | None = None) -> None:
+    """Validate tasks, embed referenced images, and generate app_html for webapp tasks."""
     from services.claude_service import generate_webapp
 
     for task in tasks:
@@ -167,6 +174,25 @@ async def _post_process_tasks(tasks: list) -> None:
         task.setdefault("task_type", "essay")
         task.setdefault("points", 1)
         task.setdefault("question_data", {})
+
+        # Embed referenced images into task text as Markdown images
+        if image_map:
+            referenced_images = task.pop("images", []) or []
+            for img_id in referenced_images:
+                if img_id in image_map:
+                    data_url = image_map[img_id]
+                    placeholder = "{{" + img_id + "}}"
+                    img_md = f"\n\n![{img_id}]({data_url})\n\n"
+                    if placeholder in task["text"]:
+                        task["text"] = task["text"].replace(placeholder, img_md)
+                    else:
+                        # No placeholder found — append image at end of text
+                        task["text"] += img_md
+                    # Also replace in solution if referenced
+                    if placeholder in task.get("solution", ""):
+                        task["solution"] = task["solution"].replace(placeholder, img_md)
+            # Clean up any unreferenced placeholders
+            task["text"] = re.sub(r'\{\{img_\d+\}\}', '', task["text"])
 
         # Generate app_html for webapp tasks
         if task["task_type"] == "webapp":
@@ -182,12 +208,14 @@ async def _post_process_tasks(tasks: list) -> None:
                 qd["grader_info"] = grader
 
 
-def _extract_docx(file_path: str) -> list[dict]:
-    """Extract text and images from a DOCX file. Returns list of content blocks for Claude."""
+def _extract_docx(file_path: str) -> tuple[list[dict], dict[str, str]]:
+    """Extract text and images from a DOCX file.
+    Returns (content_blocks_for_claude, image_map: {img_id: data_url})."""
     import docx
 
     doc = docx.Document(file_path)
     content = []
+    image_map = {}
 
     # Extract full text
     paragraphs = []
@@ -210,7 +238,7 @@ def _extract_docx(file_path: str) -> list[dict]:
             "text": "--- Dokumentinhalt ---\n\n" + "\n\n".join(paragraphs),
         })
 
-    # Extract embedded images
+    # Extract embedded images with IDs
     image_count = 0
     for rel in doc.part.rels.values():
         if "image" in rel.reltype:
@@ -226,9 +254,11 @@ def _extract_docx(file_path: str) -> list[dict]:
 
                 b64 = base64.b64encode(img_data).decode("utf-8")
                 image_count += 1
+                img_id = f"img_{image_count}"
+                image_map[img_id] = f"data:{media_type};base64,{b64}"
                 content.append({
                     "type": "text",
-                    "text": f"--- Eingebettetes Bild {image_count} ---",
+                    "text": f"--- Bild ID: {img_id} ---",
                 })
                 content.append({
                     "type": "image",
@@ -241,18 +271,21 @@ def _extract_docx(file_path: str) -> list[dict]:
             except Exception:
                 continue
 
-    return content
+    return content, image_map
 
 
-def _extract_pdf(file_path: str) -> list[dict]:
-    """Render PDF pages as images. Returns list of content blocks for Claude."""
+def _extract_pdf(file_path: str) -> tuple[list[dict], dict[str, str]]:
+    """Render PDF pages as images + extract embedded images.
+    Returns (content_blocks_for_claude, image_map: {img_id: data_url})."""
     import fitz
 
     doc = fitz.open(file_path)
     content = []
+    image_map = {}
 
     # Limit to 20 pages
     page_count = min(len(doc), 20)
+    image_count = 0
 
     for i in range(page_count):
         page = doc[i]
@@ -273,8 +306,38 @@ def _extract_pdf(file_path: str) -> list[dict]:
             },
         })
 
+        # Extract individual images from this page
+        for img_info in page.get_images(full=True):
+            try:
+                xref = img_info[0]
+                base_image = doc.extract_image(xref)
+                if not base_image or base_image["width"] < 50 or base_image["height"] < 50:
+                    continue  # Skip tiny images (icons, bullets)
+                img_ext = base_image["ext"]
+                if img_ext not in ("png", "jpeg", "jpg"):
+                    continue
+                media_type = f"image/{'jpeg' if img_ext == 'jpg' else img_ext}"
+                img_b64 = base64.b64encode(base_image["image"]).decode("utf-8")
+                image_count += 1
+                img_id = f"img_{image_count}"
+                image_map[img_id] = f"data:{media_type};base64,{img_b64}"
+                content.append({
+                    "type": "text",
+                    "text": f"--- Einzelbild auf Seite {i+1}, ID: {img_id} ---",
+                })
+                content.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": img_b64,
+                    },
+                })
+            except Exception:
+                continue
+
     doc.close()
-    return content
+    return content, image_map
 
 
 async def import_document(file_path: str, original_filename: str, allowed_types: list[str] | None = None, coding_language: str = "") -> list[dict]:
@@ -288,9 +351,9 @@ async def import_document(file_path: str, original_filename: str, allowed_types:
     ext = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else ""
 
     if ext == "docx":
-        content = _extract_docx(file_path)
+        content, image_map = _extract_docx(file_path)
     else:
-        content = _extract_pdf(file_path)
+        content, image_map = _extract_pdf(file_path)
 
     if not content:
         raise ValueError("Keine Inhalte im Dokument gefunden.")
@@ -309,8 +372,8 @@ async def import_document(file_path: str, original_filename: str, allowed_types:
 
     tasks = _parse_json_response(response.content[0].text)
 
-    # Validate and post-process
-    await _post_process_tasks(tasks)
+    # Validate, embed images, and post-process
+    await _post_process_tasks(tasks, image_map)
 
     return tasks
 
@@ -325,9 +388,9 @@ async def import_document_with_instructions(
     ext = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else ""
 
     if ext == "docx":
-        content = _extract_docx(file_path)
+        content, image_map = _extract_docx(file_path)
     else:
-        content = _extract_pdf(file_path)
+        content, image_map = _extract_pdf(file_path)
 
     if not content:
         raise ValueError("Keine Inhalte im Dokument gefunden.")
@@ -355,7 +418,7 @@ async def import_document_with_instructions(
 
     tasks = _parse_json_response(response.content[0].text)
 
-    # Validate and post-process
-    await _post_process_tasks(tasks)
+    # Validate, embed images, and post-process
+    await _post_process_tasks(tasks, image_map)
 
     return tasks

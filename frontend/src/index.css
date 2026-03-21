@@ -1695,6 +1695,22 @@ a:hover {
   border-left: 3px solid var(--border);
 }
 
+.md-embedded-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin: 8px 0;
+  display: block;
+}
+
+@media print {
+  .md-embedded-image {
+    max-width: 60% !important;
+    break-inside: avoid;
+  }
+}
+
 .mermaid-diagram {
   margin: 12px 0;
   text-align: center;

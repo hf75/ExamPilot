@@ -61,6 +61,17 @@ export default function Markdown({ children }) {
             }
             return <code className={className} {...props}>{codeChildren}</code>;
           },
+          img({ src, alt, ...props }) {
+            return (
+              <img
+                src={src}
+                alt={alt || ""}
+                className="md-embedded-image"
+                loading="lazy"
+                {...props}
+              />
+            );
+          },
         }}
       >
         {children}
