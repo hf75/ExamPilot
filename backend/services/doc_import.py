@@ -92,7 +92,7 @@ _DOC_TYPE_DESCRIPTIONS = {
 }
 
 
-def _build_task_prompt(allowed_types: list[str] | None = None) -> str:
+def _build_task_prompt(allowed_types: list[str] | None = None, coding_language: str = "") -> str:
     """Build the task generation prompt, optionally filtered by allowed types."""
     if allowed_types:
         types = [t for t in allowed_types if t in _DOC_TYPE_DESCRIPTIONS]
@@ -100,6 +100,11 @@ def _build_task_prompt(allowed_types: list[str] | None = None) -> str:
         types = list(_DOC_TYPE_DESCRIPTIONS.keys())
 
     type_lines = "\n".join(f"- {_DOC_TYPE_DESCRIPTIONS[t]}" for t in types)
+
+    coding_hint = ""
+    if coding_language and "coding" in types:
+        lang_labels = {"javascript": "JavaScript", "python": "Python", "sql": "SQL", "html": "HTML/CSS", "typescript": "TypeScript"}
+        coding_hint = f"\n\nWICHTIG fuer Programmieraufgaben: Verwende die Sprache {lang_labels.get(coding_language, coding_language)} (language: \"{coding_language}\")."
 
     return f"""Analysiere dieses Dokument und erstelle daraus strukturierte Prüfungsaufgaben.
 
@@ -134,7 +139,8 @@ WICHTIG: Jede Aufgabe MUSS eine ausführliche "solution" (Musterlösung) enthalt
 - Bei Multiple Choice: Erkläre warum die richtige Antwort korrekt ist
 - Bei Kurzantwort/Numerisch: Gib die korrekte Antwort mit Erklärung
 - Bei Essay/Freitext: Beschreibe was eine vollständige Antwort enthalten sollte
-- Bei Zuordnung/Reihenfolge: Erkläre die korrekte Zuordnung/Reihenfolge"""
+- Bei Zuordnung/Reihenfolge: Erkläre die korrekte Zuordnung/Reihenfolge
+- Bei Programmierung: Erstelle IMMER mindestens 3 sinnvolle test_cases{coding_hint}"""
 
 SYSTEM_PROMPT = """Du bist ein erfahrener Lehrer. Analysiere das hochgeladene Dokument und erstelle daraus strukturierte Prüfungsaufgaben in verschiedenen Formaten.
 Antworte IMMER als valides JSON-Array. Keine zusätzliche Erklärung.
@@ -266,7 +272,7 @@ def _extract_pdf(file_path: str) -> list[dict]:
     return content
 
 
-async def import_document(file_path: str, original_filename: str, allowed_types: list[str] | None = None) -> list[dict]:
+async def import_document(file_path: str, original_filename: str, allowed_types: list[str] | None = None, coding_language: str = "") -> list[dict]:
     """
     Import tasks from a document (PDF or DOCX).
     - DOCX: Extracts text + images directly via python-docx
@@ -285,7 +291,7 @@ async def import_document(file_path: str, original_filename: str, allowed_types:
         raise ValueError("Keine Inhalte im Dokument gefunden.")
 
     # Append task generation prompt
-    content.append({"type": "text", "text": _build_task_prompt(allowed_types)})
+    content.append({"type": "text", "text": _build_task_prompt(allowed_types, coding_language)})
 
     async with _semaphore:
         response = await asyncio.to_thread(
@@ -321,8 +327,13 @@ async def import_document_with_instructions(
     if not content:
         raise ValueError("Keine Inhalte im Dokument gefunden.")
 
+    # Extract coding language from instructions if present
+    import re as _re
+    lang_match = _re.search(r'language:\s*"(\w+)"', instructions)
+    _coding_lang = lang_match.group(1) if lang_match else ""
+
     # Build a customized prompt with teacher instructions
-    custom_prompt = _build_task_prompt(allowed_types)
+    custom_prompt = _build_task_prompt(allowed_types, _coding_lang)
     if instructions.strip():
         custom_prompt += f"\n\nWICHTIG — Anweisungen des Lehrers:\n{instructions.strip()}\n\nHalte dich unbedingt an diese Anweisungen bei der Erstellung der Aufgaben."
 

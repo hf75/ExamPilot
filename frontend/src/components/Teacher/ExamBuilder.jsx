@@ -513,6 +513,7 @@ function AdhocExamForm({ onDone, onCancel }) {
   });
   const [files, setFiles] = useState([]);
   const [allowedTypes, setAllowedTypes] = useState(Object.keys(GENERATABLE_TYPES));
+  const [codingLanguage, setCodingLanguage] = useState("python");
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState("");
 
@@ -549,7 +550,13 @@ function AdhocExamForm({ onDone, onCancel }) {
       formData.append("class_name", form.class_name);
       formData.append("date", form.date);
       formData.append("duration_minutes", form.duration_minutes || "");
-      formData.append("instructions", form.instructions);
+      let finalInstructions = form.instructions;
+      if (allowedTypes.includes("coding") && codingLanguage) {
+        const langLabels = { javascript: "JavaScript", python: "Python", sql: "SQL", html: "HTML/CSS", typescript: "TypeScript" };
+        const langHint = `Programmieraufgaben sollen in ${langLabels[codingLanguage] || codingLanguage} (language: "${codingLanguage}") erstellt werden.`;
+        finalInstructions = finalInstructions ? `${finalInstructions}\n${langHint}` : langHint;
+      }
+      formData.append("instructions", finalInstructions);
       if (allowedTypes.length > 0) {
         formData.append("allowed_types", allowedTypes.join(","));
       }
@@ -646,6 +653,19 @@ function AdhocExamForm({ onDone, onCancel }) {
         </div>
 
         <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} />
+
+        {allowedTypes.includes("coding") && (
+          <div className="form-group">
+            <label>Programmiersprache fuer Coding-Aufgaben</label>
+            <select value={codingLanguage} onChange={(e) => setCodingLanguage(e.target.value)}>
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="sql">SQL</option>
+              <option value="html">HTML/CSS</option>
+              <option value="typescript">TypeScript</option>
+            </select>
+          </div>
+        )}
 
         <div className="form-group">
           <label>Beschreibung (optional)</label>

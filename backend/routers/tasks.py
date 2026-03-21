@@ -190,6 +190,7 @@ async def move_task(
 async def import_document_endpoint(
     file: UploadFile = File(...),
     allowed_types: str = Form(""),
+    coding_language: str = Form(""),
     _: bool = Depends(require_teacher),
 ):
     """Import tasks from PDF or DOCX via AI analysis."""
@@ -209,7 +210,7 @@ async def import_document_endpoint(
         tmp_path = tmp.name
 
     try:
-        tasks = await import_document(tmp_path, filename, types_list)
+        tasks = await import_document(tmp_path, filename, types_list, coding_language)
         return {"tasks": tasks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Dokumentimport fehlgeschlagen: {str(e)}")

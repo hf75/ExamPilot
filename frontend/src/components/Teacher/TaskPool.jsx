@@ -507,9 +507,32 @@ export default function TaskPool() {
   );
 }
 
+const CODING_LANGUAGES = {
+  javascript: "JavaScript",
+  python: "Python",
+  sql: "SQL",
+  html: "HTML/CSS",
+  typescript: "TypeScript",
+};
+
+function CodingLanguageSelector({ selected, onChange, visible }) {
+  if (!visible) return null;
+  return (
+    <div className="form-group">
+      <label>Programmiersprache fuer Coding-Aufgaben</label>
+      <select value={selected} onChange={(e) => onChange(e.target.value)}>
+        {Object.entries(CODING_LANGUAGES).map(([k, v]) => (
+          <option key={k} value={k}>{v}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function DocumentImportModal({ poolId, onClose, onImported }) {
   const [files, setFiles] = useState([]);
   const [allowedTypes, setAllowedTypes] = useState(Object.keys(GENERATABLE_TYPES));
+  const [codingLanguage, setCodingLanguage] = useState("python");
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState("");
@@ -537,8 +560,12 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
         setLoadingStatus(`Dokument ${i + 1} von ${files.length}: ${files[i].name}`);
         const formData = new FormData();
         formData.append("file", files[i]);
-        if (allowedTypes.length > 0) {
-          formData.append("allowed_types", allowedTypes.join(","));
+        const typesToSend = allowedTypes.length > 0 ? allowedTypes.join(",") : "";
+        if (typesToSend) {
+          formData.append("allowed_types", typesToSend);
+        }
+        if (allowedTypes.includes("coding")) {
+          formData.append("coding_language", codingLanguage);
         }
         const res = await fetch(
           `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/tasks/import-document`,
@@ -640,6 +667,11 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
             )}
             <p className="qd-hint">Die KI analysiert jedes Dokument einzeln und erstellt automatisch passende Aufgaben.</p>
             <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} />
+            <CodingLanguageSelector
+              selected={codingLanguage}
+              onChange={setCodingLanguage}
+              visible={allowedTypes.includes("coding")}
+            />
             {loading && loadingStatus && (
               <p className="import-status">{loadingStatus}</p>
             )}
@@ -693,6 +725,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
   const [difficulty, setDifficulty] = useState("mittel");
   const [instructions, setInstructions] = useState("");
   const [allowedTypes, setAllowedTypes] = useState(Object.keys(GENERATABLE_TYPES));
+  const [codingLanguage, setCodingLanguage] = useState("python");
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -701,11 +734,17 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
     if (!topic.trim()) return;
     setLoading(true);
     try {
+      let finalInstructions = instructions.trim();
+      if (allowedTypes.includes("coding") && codingLanguage) {
+        const langLabel = CODING_LANGUAGES[codingLanguage] || codingLanguage;
+        const langHint = `Programmieraufgaben sollen in ${langLabel} (language: "${codingLanguage}") erstellt werden.`;
+        finalInstructions = finalInstructions ? `${finalInstructions}\n${langHint}` : langHint;
+      }
       const data = await api.post("/api/tasks/generate", {
         topic,
         count,
         difficulty,
-        instructions: instructions.trim() || undefined,
+        instructions: finalInstructions || undefined,
         allowed_types: allowedTypes.length > 0 ? allowedTypes : undefined,
       });
       setPreview(data.tasks);
@@ -797,6 +836,11 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
               />
             </div>
             <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} />
+            <CodingLanguageSelector
+              selected={codingLanguage}
+              onChange={setCodingLanguage}
+              visible={allowedTypes.includes("coding")}
+            />
             <button
               className="btn-primary"
               onClick={handleGenerate}
