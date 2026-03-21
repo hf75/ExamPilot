@@ -6,8 +6,14 @@ import re
 
 def is_auto_gradable(task_type: str, question_data: dict | None = None) -> bool:
     if task_type == "coding":
-        lang = (question_data or {}).get("language", "")
-        return lang != "html"  # HTML/CSS needs AI grading
+        qd = question_data or {}
+        lang = qd.get("language", "")
+        if lang == "html":
+            return False  # HTML/CSS always needs AI grading
+        # If no test cases defined (and not SQL with expected), fall back to AI
+        has_tests = bool(qd.get("test_cases"))
+        has_sql_expected = lang == "sql" and bool(qd.get("sql_expected"))
+        return has_tests or has_sql_expected
     return task_type in {"multichoice", "truefalse", "numerical", "matching", "ordering", "cloze"}
 
 

@@ -224,6 +224,64 @@ Maximale Punktzahl: {max_points}"""
         result["points"] = max(0, min(max_points, result.get("points", 0)))
         return result
 
+    if task_type == "coding":
+        language = (question_data or {}).get("language", "javascript")
+        lang_label = {"javascript": "JavaScript", "python": "Python", "sql": "SQL", "html": "HTML/CSS", "typescript": "TypeScript"}.get(language, language)
+        grader_info = ""
+        if question_data and question_data.get("grader_info"):
+            grader_info = f"\nBewertungskriterien des Lehrers: {question_data['grader_info']}"
+
+        # Extract just the code from the JSON answer
+        code_to_grade = student_answer
+        try:
+            parsed = json.loads(student_answer)
+            code_to_grade = parsed.get("code", student_answer)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        system_prompt = f"""Du bist ein Prüfer an einer Berufsschule und bewertest Programmieraufgaben.
+Schreibe das Feedback in direkter Ansprache ("Du hast...", "Dir fehlt..."), nicht in dritter Person.
+
+Programmiersprache: {lang_label}
+
+Bewerte den eingereichten Code:
+- Ist der Code korrekt und löst die Aufgabe?
+- Ist der Code sauber und verständlich geschrieben?
+- Werden Edge Cases behandelt?
+- Gibt es Fehler oder Verbesserungsmöglichkeiten?{grader_info}
+
+Antworte als JSON:
+{{
+  "points": <0 bis {max_points}>,
+  "correct": true/false,
+  "feedback": "Begründung in Du-Form mit konkreten Hinweisen zum Code"
+}}"""
+
+        solution_text = solution or "Keine Angabe"
+        user_message = f"""Aufgabe: {task_text}
+
+Musterlösung: {solution_text}
+
+Eingereichter Code ({lang_label}):
+```{language}
+{code_to_grade}
+```
+
+Maximale Punktzahl: {max_points}"""
+
+        async with _semaphore:
+            response = await asyncio.to_thread(
+                get_client().messages.create,
+                model=CLAUDE_MODEL,
+                max_tokens=CLAUDE_MAX_TOKENS,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+            )
+
+        result = _parse_json_response(response.content[0].text)
+        result["points"] = max(0, min(max_points, result.get("points", 0)))
+        return result
+
     if task_type == "drawing":
         grader_info = ""
         if question_data and question_data.get("grader_info"):
@@ -359,6 +417,7 @@ _ALL_TYPE_DESCRIPTIONS = {
     "webapp": "webapp (Interaktive Web-App, z.B. Spreadsheet, Kalkulation, Zuordnungsaufgabe)",
     "feynman": "feynman (Erkläraufgabe: Schüler erklärt ein Konzept einem unwissenden KI-Kollegen im Chat-Dialog)",
     "scenario": "scenario (Branching-Szenario: Interaktive Entscheidungssimulation, Schüler navigiert durch verzweigende Situationen)",
+    "coding": "coding (Programmieraufgabe: Schüler schreibt Code in JavaScript, Python, SQL, HTML/CSS oder TypeScript mit automatischen Testfällen)",
 }
 
 _ALL_TYPE_QD = {
@@ -373,6 +432,7 @@ _ALL_TYPE_QD = {
     "webapp": '- webapp: {{"app_description": "Beschreibung der interaktiven App die erstellt werden soll", "grader_info": "Bewertungskriterien für den exportierten App-Zustand"}}',
     "feynman": '- feynman: {{"concept": "Das zu erklärende Konzept", "context": "Fachgebiet/Kontext", "max_turns": 10, "grader_info": "Bewertungskriterien"}}',
     "scenario": '- scenario: {{"scenario_description": "Ausgangssituation des Szenarios", "context": "Fachgebiet z.B. BWL, Recht", "max_decisions": 5, "grader_info": "Bewertungskriterien für den Entscheidungspfad"}}',
+    "coding": '- coding: {{"language": "javascript|python|sql|html|typescript", "starter_code": "function solve(n) {{\\n  // Code hier\\n}}", "test_cases": [{{"input": "solve(5)", "expected_output": "25", "description": "Quadrat von 5"}}, {{"input": "solve(0)", "expected_output": "0", "description": "Null"}}], "hidden_tests": false, "sql_schema": "(nur bei SQL: CREATE TABLE + INSERT statements)", "sql_expected": "(nur bei SQL: erwartetes Ergebnis als JSON-Array)", "grader_info": "(nur bei HTML: Bewertungskriterien)"}} — WICHTIG: Bei coding-Aufgaben IMMER mindestens 3 sinnvolle test_cases angeben! Bei SQL stattdessen sql_schema und sql_expected angeben.',
 }
 
 

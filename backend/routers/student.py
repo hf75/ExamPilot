@@ -258,8 +258,8 @@ async def submit_answer(
     # AI-graded types: save answer now, grade only on submit to avoid locking tasks
     needs_ai_grading = False  # no longer grade during auto-save
     grade_later = task_type in ("essay", "shortanswer", "drawing", "webapp", "feynman", "scenario")
-    # Coding with HTML language needs AI grading
-    if task_type == "coding" and question_data.get("language") == "html":
+    # Coding without test cases or HTML language → AI grading
+    if task_type == "coding" and not is_auto_gradable(task_type, question_data):
         grade_later = True
 
     if task_type == "description":
