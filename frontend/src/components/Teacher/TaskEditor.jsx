@@ -16,6 +16,7 @@ const TASK_TYPES = {
   feynman: "Feynman-Erklärung",
   scenario: "Branching-Szenario",
   coding: "Programmierung",
+  photo: "Foto-Aufgabe",
 };
 
 function getDefaultQuestionData(type) {
@@ -47,6 +48,8 @@ function getDefaultQuestionData(type) {
       return { concept: "", context: "", max_turns: 10, grader_info: "" };
     case "scenario":
       return { scenario_description: "", context: "", max_decisions: 5, grader_info: "" };
+    case "photo":
+      return { grader_info: "" };
     case "coding":
       return {
         language: "javascript",
@@ -240,6 +243,9 @@ export default function TaskEditor({ task, poolId, onSave, onCancel }) {
           )}
           {form.task_type === "scenario" && (
             <ScenarioConfig qd={qd} onChange={updateQD} />
+          )}
+          {form.task_type === "photo" && (
+            <PhotoConfig qd={qd} onChange={updateQD} />
           )}
           {form.task_type === "coding" && (
             <CodingConfig qd={qd} onChange={updateQD} />
@@ -888,6 +894,27 @@ function ScenarioConfig({ qd, onChange }) {
           onChange={(e) => onChange({ grader_info: e.target.value })}
           placeholder="z.B. Schüler soll wirtschaftliche Konsequenzen abwägen, Vertragsrecht beachten und eine nachhaltige Lösung finden"
           rows={3}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PhotoConfig({ qd, onChange }) {
+  return (
+    <div className="qd-section">
+      <h4>Foto-Aufgabe Konfiguration</h4>
+      <p className="qd-hint">
+        Der Schueler fotografiert ein reales Objekt oder Ergebnis mit der Handy-Kamera.
+        Die KI bewertet das Foto anhand deiner Kriterien.
+      </p>
+      <div className="form-group">
+        <label>Bewertungskriterien fuer die KI</label>
+        <textarea
+          value={qd.grader_info || ""}
+          onChange={(e) => onChange({ grader_info: e.target.value })}
+          placeholder={"z.B. 'Das Foto soll ein korrekt gecrimptes RJ45-Kabel zeigen. Bewerte: Adern in richtiger Reihenfolge (T568B), Mantel im Stecker fixiert, keine abstehenden Adern.'"}
+          rows={4}
         />
       </div>
     </div>

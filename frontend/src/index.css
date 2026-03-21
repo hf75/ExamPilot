@@ -3822,6 +3822,83 @@ a:hover {
   }
 }
 
+/* Photo Task */
+.question-photo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.photo-upload-container {
+  text-align: center;
+  padding: 32px 20px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+}
+
+.photo-options {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.photo-option-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 24px;
+  min-width: 120px;
+}
+
+.photo-option-icon {
+  font-size: 28px;
+}
+
+.photo-hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 0;
+}
+
+.photo-preview-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.photo-preview {
+  max-width: 100%;
+  max-height: 500px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  object-fit: contain;
+}
+
+.photo-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.photo-camera-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.photo-video {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: var(--radius);
+  border: 2px solid var(--accent);
+  background: black;
+}
+
 /* Coding Task */
 .question-coding {
   display: flex;

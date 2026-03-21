@@ -18,6 +18,7 @@ const TASK_TYPES = {
   feynman: "Feynman-Erklärung",
   scenario: "Branching-Szenario",
   coding: "Programmierung",
+  photo: "Foto-Aufgabe",
 };
 
 const GENERATABLE_TYPES = {
@@ -33,6 +34,7 @@ const GENERATABLE_TYPES = {
   feynman: "Feynman-Erklärung",
   scenario: "Branching-Szenario",
   coding: "Programmierung",
+  photo: "Foto-Aufgabe",
 };
 
 function TaskTypeFilter({ selected, onChange }) {

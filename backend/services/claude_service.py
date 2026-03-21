@@ -282,6 +282,55 @@ Maximale Punktzahl: {max_points}"""
         result["points"] = max(0, min(max_points, result.get("points", 0)))
         return result
 
+    if task_type == "photo":
+        grader_info = ""
+        if question_data and question_data.get("grader_info"):
+            grader_info = f"\nBewertungskriterien: {question_data['grader_info']}"
+
+        system_prompt = f"""Du bist ein Prüfer an einer Berufsschule.
+Schreibe das Feedback in direkter Ansprache ("Du hast...", "Dir fehlt..."), nicht in dritter Person.
+
+Bewerte das folgende Foto, das ein Schüler als Antwort auf eine Aufgabe eingereicht hat.
+- Prüfe ob das Foto die gestellte Aufgabe korrekt beantwortet
+- Bewerte: Korrektheit, Vollständigkeit, Qualität der Ausführung
+- Berücksichtige ob das gezeigte Objekt/Ergebnis fachgerecht ist{grader_info}
+
+Antworte als JSON:
+{{
+  "points": <0 bis {max_points}>,
+  "correct": true/false,
+  "feedback": "Begründung in Du-Form mit konkreten Beobachtungen zum Foto"
+}}"""
+
+        # Parse image from answer
+        content_blocks = [{"type": "text", "text": f"Aufgabe: {task_text}\n\nMusterlösung: {solution or 'Keine Angabe'}\n\nMaximale Punktzahl: {max_points}"}]
+        if student_answer and student_answer.startswith("data:image"):
+            # Extract base64 data
+            try:
+                header, b64_data = student_answer.split(",", 1)
+                media_type = header.split(":")[1].split(";")[0]
+                content_blocks.append({
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": media_type, "data": b64_data},
+                })
+            except Exception:
+                content_blocks.append({"type": "text", "text": f"Foto-Daten: {student_answer[:200]}"})
+        else:
+            content_blocks.append({"type": "text", "text": f"Antwort: {student_answer or 'Kein Foto eingereicht'}"})
+
+        async with _semaphore:
+            response = await asyncio.to_thread(
+                get_client().messages.create,
+                model=CLAUDE_MODEL,
+                max_tokens=CLAUDE_MAX_TOKENS,
+                system=system_prompt,
+                messages=[{"role": "user", "content": content_blocks}],
+            )
+
+        result = _parse_json_response(response.content[0].text)
+        result["points"] = max(0, min(max_points, result.get("points", 0)))
+        return result
+
     if task_type == "drawing":
         grader_info = ""
         if question_data and question_data.get("grader_info"):
@@ -418,6 +467,7 @@ _ALL_TYPE_DESCRIPTIONS = {
     "feynman": "feynman (Erkläraufgabe: Schüler erklärt ein Konzept einem unwissenden KI-Kollegen im Chat-Dialog)",
     "scenario": "scenario (Branching-Szenario: Interaktive Entscheidungssimulation, Schüler navigiert durch verzweigende Situationen)",
     "coding": "coding (Programmieraufgabe: Schüler schreibt Code in JavaScript, Python, SQL, HTML/CSS oder TypeScript mit automatischen Testfällen)",
+    "photo": "photo (Foto-Aufgabe: Schüler fotografiert ein reales Objekt/Ergebnis mit der Handy-Kamera, KI bewertet das Bild — ideal für Werkstatt, Labor, Handwerk, Botanik)",
 }
 
 _ALL_TYPE_QD = {
@@ -432,6 +482,7 @@ _ALL_TYPE_QD = {
     "webapp": '- webapp: {{"app_description": "Beschreibung der interaktiven App die erstellt werden soll", "grader_info": "Bewertungskriterien für den exportierten App-Zustand"}}',
     "feynman": '- feynman: {{"concept": "Das zu erklärende Konzept", "context": "Fachgebiet/Kontext", "max_turns": 10, "grader_info": "Bewertungskriterien"}}',
     "scenario": '- scenario: {{"scenario_description": "Ausgangssituation des Szenarios", "context": "Fachgebiet z.B. BWL, Recht", "max_decisions": 5, "grader_info": "Bewertungskriterien für den Entscheidungspfad"}}',
+    "photo": '- photo: {{"grader_info": "Was auf dem Foto zu sehen sein soll und Bewertungskriterien"}}',
     "coding": '- coding: {{"language": "javascript|python|sql|html|typescript", "starter_code": "function solve(n) {{\\n  // Code hier\\n}}", "test_cases": [{{"input": "solve(5)", "expected_output": "25", "description": "Quadrat von 5"}}, {{"input": "solve(0)", "expected_output": "0", "description": "Null"}}], "hidden_tests": false, "sql_schema": "(nur bei SQL: CREATE TABLE + INSERT statements)", "sql_expected": "(nur bei SQL: erwartetes Ergebnis als JSON-Array)", "grader_info": "(nur bei HTML: Bewertungskriterien)"}} — WICHTIG: Bei coding-Aufgaben IMMER mindestens 3 sinnvolle test_cases angeben! Bei SQL stattdessen sql_schema und sql_expected angeben.',
 }
 

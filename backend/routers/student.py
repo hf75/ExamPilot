@@ -143,7 +143,7 @@ async def get_session(
         t.pop("grader_info", None)
         # Strip correct-answer info from question_data for essay/shortanswer
         qd_clean = t["question_data"]
-        if t.get("task_type") in ("essay", "drawing", "webapp", "feynman", "scenario", "coding") and isinstance(qd_clean, dict):
+        if t.get("task_type") in ("essay", "drawing", "webapp", "feynman", "scenario", "coding", "photo") and isinstance(qd_clean, dict):
             qd_clean.pop("grader_info", None)
         tasks.append(t)
 
@@ -257,7 +257,7 @@ async def submit_answer(
     # Grade based on task type
     # AI-graded types: save answer now, grade only on submit to avoid locking tasks
     needs_ai_grading = False  # no longer grade during auto-save
-    grade_later = task_type in ("essay", "shortanswer", "drawing", "webapp", "feynman", "scenario")
+    grade_later = task_type in ("essay", "shortanswer", "drawing", "webapp", "feynman", "scenario", "photo")
     # Coding without test cases or HTML language → AI grading
     if task_type == "coding" and not is_auto_gradable(task_type, question_data):
         grade_later = True

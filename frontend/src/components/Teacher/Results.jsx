@@ -18,6 +18,7 @@ const TASK_TYPES = {
   feynman: "Feynman",
   scenario: "Szenario",
   coding: "Code",
+  photo: "Foto",
 };
 
 export default function Results() {

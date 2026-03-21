@@ -88,6 +88,7 @@ _DOC_TYPE_DESCRIPTIONS = {
     "feynman": 'feynman: Erkläraufgabe — Schüler erklärt ein Konzept einem unwissenden KI-Kollegen im Chat (question_data: {"concept": "...", "context": "...", "max_turns": 10, "grader_info": "..."})',
     "scenario": 'scenario: Branching-Szenario — Schüler navigiert durch interaktive Entscheidungssituationen (question_data: {"scenario_description": "...", "context": "...", "max_decisions": 5, "grader_info": "..."})',
     "description": 'description: Nur Beschreibung/Info (question_data: {})',
+    "photo": 'photo: Foto-Aufgabe — Schüler fotografiert reales Objekt/Ergebnis mit der Kamera (question_data: {"grader_info": "Was auf dem Foto zu sehen sein soll"}) — ideal für Werkstatt, Labor, Handwerk',
     "coding": 'coding: Programmieraufgabe (question_data: {"language": "javascript|python|sql|html|typescript", "starter_code": "Vorgabecode", "test_cases": [{"input": "funktionsaufruf(args)", "expected_output": "erwartetes Ergebnis", "description": "Testbeschreibung"}], "hidden_tests": false}) — IMMER mindestens 3 test_cases angeben! Bei SQL statt test_cases: {"sql_schema": "CREATE TABLE + INSERT ...", "sql_expected": [["spalte"], ["wert"]]}. Bei HTML: {"grader_info": "Bewertungskriterien"}',
 }
 
