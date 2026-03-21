@@ -13,6 +13,9 @@ export default function ResultView() {
   const [submitting, setSubmitting] = useState(false);
   const [explanations, setExplanations] = useState({});
   const [loadingExplain, setLoadingExplain] = useState({});
+  const [learningMaterial, setLearningMaterial] = useState(null);
+  const [learningLoading, setLearningLoading] = useState(false);
+  const [showLearning, setShowLearning] = useState(false);
 
   const loadResults = useCallback(() => {
     setLoading(true);
@@ -45,6 +48,57 @@ export default function ResultView() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleGenerateLearning() {
+    setShowLearning(true);
+    if (learningMaterial) return;
+    setLearningLoading(true);
+    try {
+      const data = await api.post(`/api/student/learning-material/${sessionId}`);
+      setLearningMaterial(data);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLearningLoading(false);
+    }
+  }
+
+  function downloadAsHTML() {
+    if (!learningMaterial) return;
+    const html = `<!DOCTYPE html>
+<html lang="de"><head><meta charset="UTF-8"><title>Lernmaterial - ${learningMaterial.exam_title}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.6;color:#333}
+h1{color:#6d28d9}h2{color:#7c3aed;border-bottom:2px solid #ede9fe;padding-bottom:4px}h3{color:#8b5cf6}
+code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:0.9em}
+pre{background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:8px;overflow-x:auto}
+pre code{background:none;color:inherit}hr{border:none;border-top:2px solid #ede9fe;margin:32px 0}
+blockquote{border-left:4px solid #7c3aed;margin:16px 0;padding:8px 16px;background:#faf5ff}
+</style></head><body>
+<h1>Persoenliches Lernmaterial</h1>
+<p><strong>${learningMaterial.student_name}</strong> — ${learningMaterial.exam_title}</p>
+<hr>
+${learningMaterial.material.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}
+</body></html>`;
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Lernmaterial_${learningMaterial.student_name}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadAsText() {
+    if (!learningMaterial) return;
+    const text = `Persoenliches Lernmaterial\n${learningMaterial.student_name} — ${learningMaterial.exam_title}\n${"=".repeat(60)}\n\n${learningMaterial.material}`;
+    const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Lernmaterial_${learningMaterial.student_name}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleExplain(answerId) {
@@ -94,10 +148,54 @@ export default function ResultView() {
             </span>
           )}
         </div>
-        <button className="btn-secondary" onClick={loadResults} style={{ marginTop: 8 }}>
-          Ergebnis neu laden
-        </button>
+        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <button className="btn-secondary" onClick={loadResults}>
+            Ergebnis neu laden
+          </button>
+          <button className="btn-primary-sm" onClick={handleGenerateLearning} disabled={learningLoading}>
+            Persoenliches Lernmaterial erstellen
+          </button>
+        </div>
       </div>
+
+      {showLearning && (
+        <div className="learning-material-panel">
+          <div className="learning-material-header">
+            <h3>Dein persoenliches Lernmaterial</h3>
+            <div style={{ display: "flex", gap: 8 }}>
+              {learningMaterial && (
+                <>
+                  <button className="btn-small" onClick={downloadAsHTML}>
+                    HTML herunterladen
+                  </button>
+                  <button className="btn-small" onClick={downloadAsText}>
+                    Markdown herunterladen
+                  </button>
+                </>
+              )}
+              <button className="btn-small" onClick={() => setShowLearning(false)}>
+                Schliessen
+              </button>
+            </div>
+          </div>
+          {learningLoading ? (
+            <div className="learning-material-loading">
+              <span className="grading-spinner"></span>
+              Dein persoenliches Lernmaterial wird erstellt... Das kann einen Moment dauern.
+            </div>
+          ) : learningMaterial ? (
+            <div className="learning-material-content">
+              {learningMaterial.weak_count > 0 && (
+                <p className="learning-material-info">
+                  Basierend auf {learningMaterial.weak_count} von {learningMaterial.total_count} Aufgaben,
+                  bei denen du noch Verbesserungspotential hast.
+                </p>
+              )}
+              <Markdown>{learningMaterial.material}</Markdown>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <div className="result-answers">
         <h3>Aufgaben im Detail</h3>

@@ -3745,6 +3745,83 @@ a:hover {
   font-size: 13px;
 }
 
+/* Learning Material Panel */
+.learning-material-panel {
+  background: var(--bg-card);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin: 16px 0;
+}
+
+.learning-material-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.learning-material-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--accent);
+}
+
+.learning-material-loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+}
+
+.learning-material-info {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border-radius: var(--radius);
+}
+
+.learning-material-content {
+  line-height: 1.7;
+}
+
+.learning-material-content .md-content h1,
+.learning-material-content .md-content h2 {
+  color: var(--accent);
+  margin-top: 24px;
+}
+
+.learning-material-content .md-content h3 {
+  color: var(--text-primary);
+  margin-top: 16px;
+}
+
+.learning-material-content .md-content blockquote {
+  background: #faf5ff;
+  border-left-color: var(--accent);
+  padding: 12px 16px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.learning-material-content .md-content hr {
+  border: none;
+  border-top: 2px solid var(--border);
+  margin: 24px 0;
+}
+
+@media print {
+  .learning-material-panel {
+    border: 1px solid #ccc !important;
+    break-inside: avoid;
+  }
+  .learning-material-header button {
+    display: none !important;
+  }
+}
+
 /* Coding Task */
 .question-coding {
   display: flex;

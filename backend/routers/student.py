@@ -684,6 +684,121 @@ async def get_results(
     }
 
 
+@router.post("/learning-material/{session_id}")
+async def generate_learning_material(
+    session_id: int, db: aiosqlite.Connection = Depends(get_db)
+):
+    """Generate personalized learning material based on a student's weak areas."""
+    # Get session + exam info
+    cursor = await db.execute(
+        """SELECT es.*, e.title as exam_title, s.name as student_name
+           FROM exam_sessions es
+           JOIN exams e ON e.id = es.exam_id
+           JOIN students s ON s.id = es.student_id
+           WHERE es.id = ?""",
+        (session_id,),
+    )
+    session = await cursor.fetchone()
+    if not session:
+        raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
+    session_dict = dict(session)
+
+    if session_dict["status"] == "in_progress":
+        raise HTTPException(status_code=400, detail="Klassenarbeit noch nicht abgegeben")
+
+    # Get all answers with task details
+    cursor = await db.execute(
+        """SELECT a.student_answer, a.points_awarded, a.feedback, a.is_correct,
+                  t.title as task_title, t.text as task_text, t.solution,
+                  t.points as max_points, t.task_type, t.topic
+           FROM answers a
+           JOIN tasks t ON t.id = a.task_id
+           WHERE a.session_id = ?""",
+        (session_id,),
+    )
+    answers = [dict(row) for row in await cursor.fetchall()]
+
+    # Filter to weak areas: wrong or partially correct
+    weak_answers = []
+    for a in answers:
+        awarded = a["points_awarded"] or 0
+        max_pts = a["max_points"] or 1
+        if awarded < max_pts * 0.8:  # Less than 80% = room to learn
+            weak_answers.append(a)
+
+    if not weak_answers:
+        return {"material": "Glueckwunsch! Du hast alle Aufgaben gut beantwortet. Kein zusaetzliches Lernmaterial noetig."}
+
+    # Build context for Claude
+    weak_sections = []
+    for i, a in enumerate(weak_answers):
+        section = f"""--- Aufgabe {i+1}: {a['task_title']} ---
+Thema: {a.get('topic') or 'Nicht angegeben'}
+Typ: {a['task_type']}
+Aufgabenstellung: {a['task_text']}
+Musterloesung: {a.get('solution') or 'Nicht verfuegbar'}
+Schueler-Antwort: {(a.get('student_answer') or 'Keine Antwort')[:500]}
+Erreichte Punkte: {a['points_awarded'] or 0}/{a['max_points']}
+Feedback: {a.get('feedback') or 'Kein Feedback'}"""
+        weak_sections.append(section)
+
+    weak_text = "\n\n".join(weak_sections)
+
+    from services.claude_service import get_client, CLAUDE_MODEL
+    from services.claude_service import _semaphore
+
+    system_prompt = """Du bist ein geduldiger, erfahrener Nachhilfelehrer an einer Berufsschule.
+Deine Aufgabe ist es, personalisiertes Lernmaterial fuer einen Schueler zu erstellen, der gerade eine Klassenarbeit geschrieben hat.
+
+Du erhaeltst die Aufgaben, bei denen der Schueler Schwaechen gezeigt hat — inklusive seiner Antworten, der Musterloesung und dem Feedback.
+
+Erstelle ein zusammenhaengendes Lernmaterial-Dokument in Markdown mit folgender Struktur:
+
+1. **Einleitung** — Ermutigende Worte, Ueberblick was gelernt wird (2-3 Saetze)
+
+2. **Lernkapitel** — Fuer jedes Thema/Schwachstelle:
+   - Ueberschrift mit dem Thema
+   - Verstaendliche Erklaerung des Konzepts (als wuerdest du es einem Freund erklaeren)
+   - Konkretes Beispiel das auf dem Fehler des Schuelers basiert
+   - "So merkst du dir das:" — Merksatz oder Eselsbruecke
+   - Wenn passend: Mermaid-Diagramme zur Visualisierung (```mermaid Bloecke)
+
+3. **Uebungsaufgaben** — Am Ende 3-5 Aufgaben die genau die Schwaechen trainieren:
+   - Verschiedene Schwierigkeitsgrade (leicht → mittel → schwer)
+   - Mit Loesungen am Ende (unter einer Trennlinie)
+
+Schreibe in der Du-Form. Sei ermutigend aber ehrlich. Verwende einfache Sprache.
+Das Material soll so gut sein, dass der Schueler beim naechsten Mal die volle Punktzahl erreichen kann."""
+
+    user_message = f"""Schueler: {session_dict['student_name']}
+Klassenarbeit: {session_dict['exam_title']}
+Gesamtergebnis: {session_dict['total_points'] or 0}/{session_dict['max_points'] or 0} Punkte
+
+Der Schueler hatte bei folgenden Aufgaben Schwierigkeiten:
+
+{weak_text}
+
+Erstelle jetzt das personalisierte Lernmaterial."""
+
+    async with _semaphore:
+        response = await asyncio.to_thread(
+            get_client().messages.create,
+            model=CLAUDE_MODEL,
+            max_tokens=16000,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+        )
+
+    material = response.content[0].text
+    return {
+        "material": material,
+        "student_name": session_dict["student_name"],
+        "exam_title": session_dict["exam_title"],
+        "weak_count": len(weak_answers),
+        "total_count": len(answers),
+    }
+
+
 @router.post("/heartbeat")
 async def heartbeat(req: HeartbeatRequest, db: aiosqlite.Connection = Depends(get_db)):
     """Track which task a student is currently on (for live dashboard)."""
