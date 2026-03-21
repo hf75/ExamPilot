@@ -4,6 +4,8 @@
 
 ExamPilot ist eine Open-Source-Webanwendung für digitale Prüfungen, interaktive Lern-Duelle und KI-basierte Bewertung. Entwickelt für den Schulalltag an Berufsschulen — aber geeignet für jede Bildungseinrichtung.
 
+> **Hinweis:** Dies ist ein Hobbyprojekt aus Leidenschaft für bessere Bildung — kein kommerzielles Produkt. Es wird in der Freizeit entwickelt und gepflegt. Bugs, raue Kanten und fehlende Features sind zu erwarten. Hilfe ist herzlich willkommen — egal ob Issues melden, Ideen einbringen oder Code beitragen!
+
 ---
 
 ## Highlights
