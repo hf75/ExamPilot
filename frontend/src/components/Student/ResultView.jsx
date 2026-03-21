@@ -180,6 +180,29 @@ export default function ResultView() {
                     />
                   </div>
                 </div>
+              ) : answer.task_type === "coding" && answer.student_answer ? (
+                <div className="coding-result-display">
+                  {(() => {
+                    try {
+                      const parsed = JSON.parse(answer.student_answer);
+                      return (
+                        <>
+                          <pre className="coding-output">{parsed.code || "Kein Code"}</pre>
+                          {parsed.test_results?.length > 0 && (
+                            <div className="coding-test-list" style={{ marginTop: 8 }}>
+                              {parsed.test_results.map((tr, i) => (
+                                <div key={i} className={`coding-test-item ${tr.passed ? "pass" : "fail"}`}>
+                                  <span className="coding-test-status">{tr.passed ? "\u2713" : "\u2717"}</span>
+                                  <span>{tr.passed ? "Bestanden" : `Fehlgeschlagen${tr.actual_output ? `: ${tr.actual_output}` : ""}`}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    } catch { return <pre className="coding-output">{answer.student_answer}</pre>; }
+                  })()}
+                </div>
               ) : answer.student_answer?.startsWith("data:image") ? (
                 <img
                   src={answer.student_answer}
