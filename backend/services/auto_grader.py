@@ -10,6 +10,8 @@ def is_auto_gradable(task_type: str, question_data: dict | None = None) -> bool:
         lang = qd.get("language", "")
         if lang == "html":
             return False  # HTML/CSS always needs AI grading
+        if lang == "blockly":
+            return bool(qd.get("test_cases"))  # Blockly generates JS, tests work
         # If no test cases defined (and not SQL with expected), fall back to AI
         has_tests = bool(qd.get("test_cases"))
         has_sql_expected = lang == "sql" and bool(qd.get("sql_expected"))

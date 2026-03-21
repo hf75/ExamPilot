@@ -515,6 +515,7 @@ const CODING_LANGUAGES = {
   sql: "SQL",
   html: "HTML/CSS",
   typescript: "TypeScript",
+  blockly: "Blockly (visuell)",
 };
 
 function CodingLanguageSelector({ selected, onChange, visible }) {

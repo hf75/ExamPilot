@@ -927,6 +927,7 @@ const CODING_LANGUAGES = {
   sql: "SQL",
   html: "HTML/CSS",
   typescript: "TypeScript",
+  blockly: "Blockly (visuell)",
 };
 
 function CodingConfig({ qd, onChange }) {

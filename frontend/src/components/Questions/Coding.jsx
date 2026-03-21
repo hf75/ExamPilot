@@ -6,7 +6,37 @@ const LANG_LABELS = {
   sql: "SQL",
   html: "HTML/CSS",
   typescript: "TypeScript",
+  blockly: "Blockly (visuell)",
 };
+
+// Lazy-load Blockly from CDN
+let blocklyPromise = null;
+function getBlockly() {
+  if (!blocklyPromise) {
+    blocklyPromise = new Promise((resolve, reject) => {
+      if (window.Blockly) { resolve(window.Blockly); return; }
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/blockly/blockly_compressed.js";
+      script.onload = () => {
+        // Load German locale + JS generator
+        const msgs = document.createElement("script");
+        msgs.src = "https://unpkg.com/blockly/msg/de.js";
+        msgs.onload = () => {
+          const gen = document.createElement("script");
+          gen.src = "https://unpkg.com/blockly/javascript_compressed.js";
+          gen.onload = () => resolve(window.Blockly);
+          gen.onerror = reject;
+          document.head.appendChild(gen);
+        };
+        msgs.onerror = reject;
+        document.head.appendChild(msgs);
+      };
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+  return blocklyPromise;
+}
 
 export default function Coding({ task, questionData, answer, onChange, disabled }) {
   const lang = questionData.language || "javascript";
@@ -15,8 +45,12 @@ export default function Coding({ task, questionData, answer, onChange, disabled 
   const [testResults, setTestResults] = useState([]);
   const [running, setRunning] = useState(false);
   const [runtimeReady, setRuntimeReady] = useState(lang === "javascript" || lang === "html");
+  const [blocklyReady, setBlocklyReady] = useState(false);
+  const [blocksXml, setBlocksXml] = useState("");
   const iframeRef = useRef(null);
   const timeoutRef = useRef(null);
+  const blocklyDivRef = useRef(null);
+  const workspaceRef = useRef(null);
 
   // Restore code from saved answer
   useEffect(() => {
@@ -25,6 +59,7 @@ export default function Coding({ task, questionData, answer, onChange, disabled 
         const parsed = JSON.parse(answer);
         if (parsed.code) setCode(parsed.code);
         if (parsed.test_results) setTestResults(parsed.test_results);
+        if (parsed.blocks_xml) setBlocksXml(parsed.blocks_xml);
       } catch {
         // not JSON, ignore
       }
@@ -33,15 +68,99 @@ export default function Coding({ task, questionData, answer, onChange, disabled 
 
   // For Python/SQL/TS: check if runtime loads (they always load in-iframe)
   useEffect(() => {
-    if (lang !== "javascript" && lang !== "html") {
+    if (lang !== "javascript" && lang !== "html" && lang !== "blockly") {
       setRuntimeReady(true); // Runtime loads inside iframe on demand
     }
   }, [lang]);
 
-  const saveAnswer = useCallback((newCode, newResults) => {
-    const data = JSON.stringify({ code: newCode, test_results: newResults });
-    onChange(data);
-  }, [onChange]);
+  // Initialize Blockly workspace
+  useEffect(() => {
+    if (lang !== "blockly" || !blocklyDivRef.current) return;
+    let ws = null;
+    getBlockly().then((Blockly) => {
+      if (!blocklyDivRef.current) return;
+      setBlocklyReady(true);
+
+      const toolbox = {
+        kind: "categoryToolbox",
+        contents: [
+          { kind: "category", name: "Logik", categorystyle: "logic_category", contents: [
+            { kind: "block", type: "controls_if" },
+            { kind: "block", type: "logic_compare" },
+            { kind: "block", type: "logic_operation" },
+            { kind: "block", type: "logic_negate" },
+            { kind: "block", type: "logic_boolean" },
+          ]},
+          { kind: "category", name: "Schleifen", categorystyle: "loop_category", contents: [
+            { kind: "block", type: "controls_repeat_ext" },
+            { kind: "block", type: "controls_whileUntil" },
+            { kind: "block", type: "controls_for" },
+            { kind: "block", type: "controls_forEach" },
+          ]},
+          { kind: "category", name: "Mathe", categorystyle: "math_category", contents: [
+            { kind: "block", type: "math_number" },
+            { kind: "block", type: "math_arithmetic" },
+            { kind: "block", type: "math_modulo" },
+            { kind: "block", type: "math_round" },
+            { kind: "block", type: "math_random_int" },
+          ]},
+          { kind: "category", name: "Text", categorystyle: "text_category", contents: [
+            { kind: "block", type: "text" },
+            { kind: "block", type: "text_join" },
+            { kind: "block", type: "text_length" },
+            { kind: "block", type: "text_print" },
+          ]},
+          { kind: "category", name: "Listen", categorystyle: "list_category", contents: [
+            { kind: "block", type: "lists_create_empty" },
+            { kind: "block", type: "lists_create_with" },
+            { kind: "block", type: "lists_length" },
+            { kind: "block", type: "lists_getIndex" },
+            { kind: "block", type: "lists_setIndex" },
+          ]},
+          { kind: "category", name: "Variablen", categorystyle: "variable_category", custom: "VARIABLE" },
+          { kind: "category", name: "Funktionen", categorystyle: "procedure_category", custom: "PROCEDURE" },
+        ],
+      };
+
+      ws = Blockly.inject(blocklyDivRef.current, {
+        toolbox,
+        grid: { spacing: 20, length: 3, colour: "#ccc", snap: true },
+        zoom: { controls: true, wheel: true, startScale: 1.0, maxScale: 2, minScale: 0.5 },
+        trashcan: true,
+      });
+      workspaceRef.current = ws;
+
+      // Restore saved blocks
+      if (blocksXml) {
+        try {
+          const dom = Blockly.utils.xml.textToDom(blocksXml);
+          Blockly.Xml.domToWorkspace(dom, ws);
+        } catch { /* ignore restore errors */ }
+      }
+
+      // On workspace change: generate code and save
+      ws.addChangeListener(() => {
+        if (!workspaceRef.current) return;
+        try {
+          const generatedCode = Blockly.JavaScript.workspaceToCode(ws);
+          setCode(generatedCode);
+          const dom = Blockly.Xml.workspaceToDom(ws);
+          const xml = Blockly.Xml.domToText(dom);
+          setBlocksXml(xml);
+        } catch { /* ignore */ }
+      });
+    });
+
+    return () => {
+      if (ws) { ws.dispose(); workspaceRef.current = null; }
+    };
+  }, [lang, blocklyDivRef.current]);
+
+  const saveAnswer = useCallback((newCode, newResults, xml) => {
+    const payload = { code: newCode, test_results: newResults };
+    if (xml || lang === "blockly") payload.blocks_xml = xml || blocksXml;
+    onChange(JSON.stringify(payload));
+  }, [onChange, lang, blocksXml]);
 
   function handleCodeChange(e) {
     const val = e.target.value;
@@ -74,6 +193,8 @@ export default function Coding({ task, questionData, answer, onChange, disabled 
       runHTML();
     } else if (lang === "sql") {
       runSQL();
+    } else if (lang === "blockly") {
+      runInSandbox("javascript"); // Blockly generates JS
     } else {
       runInSandbox(lang);
     }
@@ -209,7 +330,7 @@ try {
         setOutput(event.data.output || "");
         setTestResults(event.data.testResults || []);
         setRunning(false);
-        saveAnswer(code, event.data.testResults || []);
+        saveAnswer(code, event.data.testResults || [], blocksXml);
       }
     }
     window.addEventListener("message", handler);
@@ -256,19 +377,35 @@ try {
         )}
       </div>
 
-      <div className="coding-editor">
-        <textarea
-          value={code}
-          onChange={handleCodeChange}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          placeholder={`${LANG_LABELS[lang]} Code hier eingeben...`}
-          spellCheck={false}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-        />
-      </div>
+      {/* Blockly Editor */}
+      {lang === "blockly" ? (
+        <div className="coding-blockly-wrap">
+          <div ref={blocklyDivRef} className="coding-blockly-editor" />
+          {code && (
+            <details className="coding-generated-code">
+              <summary>Generierter JavaScript-Code</summary>
+              <pre className="coding-output">{code}</pre>
+            </details>
+          )}
+          {!blocklyReady && (
+            <div className="coding-loading">Blockly wird geladen...</div>
+          )}
+        </div>
+      ) : (
+        <div className="coding-editor">
+          <textarea
+            value={code}
+            onChange={handleCodeChange}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+            placeholder={`${LANG_LABELS[lang]} Code hier eingeben...`}
+            spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+          />
+        </div>
+      )}
 
       {/* HTML Preview */}
       {lang === "html" && (

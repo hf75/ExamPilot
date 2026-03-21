@@ -466,7 +466,7 @@ _ALL_TYPE_DESCRIPTIONS = {
     "webapp": "webapp (Interaktive Web-App, z.B. Spreadsheet, Kalkulation, Zuordnungsaufgabe)",
     "feynman": "feynman (Erkläraufgabe: Schüler erklärt ein Konzept einem unwissenden KI-Kollegen im Chat-Dialog)",
     "scenario": "scenario (Branching-Szenario: Interaktive Entscheidungssimulation, Schüler navigiert durch verzweigende Situationen)",
-    "coding": "coding (Programmieraufgabe: Schüler schreibt Code in JavaScript, Python, SQL, HTML/CSS oder TypeScript mit automatischen Testfällen)",
+    "coding": "coding (Programmieraufgabe: Schüler schreibt Code in JavaScript, Python, SQL, HTML/CSS, TypeScript oder Blockly (visuell) mit automatischen Testfällen)",
     "photo": "photo (Foto-Aufgabe: Schüler fotografiert ein reales Objekt/Ergebnis mit der Handy-Kamera, KI bewertet das Bild — ideal für Werkstatt, Labor, Handwerk, Botanik)",
 }
 
