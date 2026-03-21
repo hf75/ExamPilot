@@ -1,10 +1,70 @@
+import { useEffect, useRef, useId } from "react";
 import ReactMarkdown from "react-markdown";
+
+// Lazy-load mermaid from CDN
+let mermaidPromise = null;
+function getMermaid() {
+  if (!mermaidPromise) {
+    mermaidPromise = new Promise((resolve, reject) => {
+      if (window.mermaid) {
+        resolve(window.mermaid);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
+      script.onload = () => {
+        window.mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
+        resolve(window.mermaid);
+      };
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+  return mermaidPromise;
+}
+
+function MermaidBlock({ code }) {
+  const ref = useRef(null);
+  const id = "mermaid-" + useId().replace(/:/g, "");
+
+  useEffect(() => {
+    let cancelled = false;
+    getMermaid().then(async (mermaid) => {
+      if (cancelled || !ref.current) return;
+      try {
+        const { svg } = await mermaid.render(id, code.trim());
+        if (!cancelled && ref.current) {
+          ref.current.innerHTML = svg;
+        }
+      } catch {
+        if (!cancelled && ref.current) {
+          ref.current.innerHTML = `<pre class="mermaid-error">${code}</pre>`;
+        }
+      }
+    });
+    return () => { cancelled = true; };
+  }, [code, id]);
+
+  return <div ref={ref} className="mermaid-diagram" />;
+}
 
 export default function Markdown({ children }) {
   if (!children) return null;
   return (
     <div className="md-content">
-      <ReactMarkdown>{children}</ReactMarkdown>
+      <ReactMarkdown
+        components={{
+          code({ className, children: codeChildren, ...props }) {
+            const match = /language-mermaid/.test(className || "");
+            if (match) {
+              return <MermaidBlock code={String(codeChildren).replace(/\n$/, "")} />;
+            }
+            return <code className={className} {...props}>{codeChildren}</code>;
+          },
+        }}
+      >
+        {children}
+      </ReactMarkdown>
     </div>
   );
 }

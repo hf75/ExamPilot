@@ -483,6 +483,13 @@ Antworte als JSON-Array:
 question_data Struktur je nach Typ:
 {qd_lines}"""
 
+    user_message += """
+
+DIAGRAMME: Du kannst im Aufgabentext Mermaid-Diagramme verwenden! Sie werden automatisch gerendert.
+Nutze ```mermaid Code-Blöcke für: ER-Diagramme, Flowcharts, Sequenzdiagramme, Klassendiagramme, Zustandsdiagramme.
+Beispiel im text-Feld: "Beschreibe das folgende ER-Diagramm:\\n\\n```mermaid\\nerDiagram\\n    KUNDE ||--o{ BESTELLUNG : bestellt\\n```"
+Verwende Diagramme wenn sie zum Thema passen — besonders bei Datenbanken, Netzwerken, Softwareentwicklung, Prozessen."""
+
     if instructions:
         user_message += f"\n\nZusätzliche Anweisungen des Lehrers:\n{instructions}"
 

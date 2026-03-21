@@ -135,6 +135,11 @@ Antworte als JSON-Array:
   }}
 ]
 
+DIAGRAMME: Du kannst im Aufgabentext Mermaid-Diagramme verwenden! Sie werden automatisch gerendert.
+Nutze ```mermaid Code-Blöcke für: ER-Diagramme, Flowcharts, Sequenzdiagramme, Klassendiagramme, Zustandsdiagramme.
+Beispiel: "Beschreibe das folgende ER-Diagramm:\\n\\n```mermaid\\nerDiagram\\n    KUNDE ||--o{{ BESTELLUNG : bestellt\\n```"
+Verwende Diagramme wenn sie zum Thema passen — besonders bei Datenbanken, Netzwerken, Softwareentwicklung, Prozessen.
+
 WICHTIG: Jede Aufgabe MUSS eine ausführliche "solution" (Musterlösung) enthalten.
 - Bei Multiple Choice: Erkläre warum die richtige Antwort korrekt ist
 - Bei Kurzantwort/Numerisch: Gib die korrekte Antwort mit Erklärung

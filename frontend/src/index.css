@@ -1695,6 +1695,33 @@ a:hover {
   border-left: 3px solid var(--border);
 }
 
+.mermaid-diagram {
+  margin: 12px 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error {
+  color: #dc2626;
+  font-size: 12px;
+  background: #fef2f2;
+  padding: 8px;
+  border-radius: var(--radius);
+}
+
+@media print {
+  .mermaid-diagram svg {
+    max-width: 80% !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
 /* Results Table */
 .results-table {
   width: 100%;
