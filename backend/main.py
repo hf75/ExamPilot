@@ -1,4 +1,7 @@
 import sys
+import warnings
+warnings.filterwarnings("ignore", message="Core Pydantic V1 functionality")
+
 import uvicorn
 from pathlib import Path
 from contextlib import asynccontextmanager

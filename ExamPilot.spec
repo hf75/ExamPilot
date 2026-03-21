@@ -33,16 +33,35 @@ a = Analysis(
         # FastAPI / Starlette
         'multipart',
         'multipart.multipart',
-        # aiosqlite
+        # Database
         'aiosqlite',
-        # anthropic
+        # AI
         'anthropic',
-        # bcrypt
+        # Auth
         'bcrypt',
-        # App modules
+        'jwt',
+        # Config
+        'dotenv',
+        # Document import
+        'fitz',
+        'docx',
+        # PDF export
+        'reportlab',
+        'reportlab.lib',
+        'reportlab.lib.colors',
+        'reportlab.lib.pagesizes',
+        'reportlab.lib.styles',
+        'reportlab.lib.units',
+        'reportlab.lib.enums',
+        'reportlab.platypus',
+        'reportlab.pdfbase',
+        'reportlab.pdfbase.pdfmetrics',
+        'reportlab.pdfbase.ttfonts',
+        # App core modules
         'config',
         'database',
         'models',
+        # Routers
         'routers',
         'routers.auth',
         'routers.tasks',
@@ -51,11 +70,18 @@ a = Analysis(
         'routers.results',
         'routers.export',
         'routers.websocket',
+        'routers.pools',
+        'routers.duel',
+        'routers.duel_ws',
+        # Services
         'services',
         'services.claude_service',
-        'services.docx_parser',
-        'services.export_service',
+        'services.auto_grader',
         'services.grading',
+        'services.export_service',
+        'services.doc_import',
+        'services.duel_engine',
+        'services.moodle_xml',
     ],
     hookspath=[],
     hooksconfig={},

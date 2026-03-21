@@ -12,6 +12,18 @@ from routers.auth import require_teacher
 router = APIRouter(prefix="/api/exams", tags=["exams"])
 
 
+def _parse_exam_row(row):
+    """Convert DB row to dict, parsing grading_scale JSON."""
+    d = dict(row)
+    gs = d.get("grading_scale")
+    if gs and isinstance(gs, str):
+        try:
+            d["grading_scale"] = json.loads(gs)
+        except (json.JSONDecodeError, TypeError):
+            d["grading_scale"] = None
+    return d
+
+
 @router.get("", response_model=list[ExamOut])
 async def list_exams(
     db: aiosqlite.Connection = Depends(get_db),
@@ -19,7 +31,7 @@ async def list_exams(
 ):
     cursor = await db.execute("SELECT * FROM exams ORDER BY created_at DESC")
     rows = await cursor.fetchall()
-    return [dict(row) for row in rows]
+    return [_parse_exam_row(row) for row in rows]
 
 
 @router.post("", response_model=ExamOut)
@@ -28,16 +40,17 @@ async def create_exam(
     db: aiosqlite.Connection = Depends(get_db),
     _: bool = Depends(require_teacher),
 ):
+    grading_scale_json = json.dumps(exam.grading_scale, ensure_ascii=False) if exam.grading_scale else None
     cursor = await db.execute(
-        """INSERT INTO exams (title, description, class_name, date, duration_minutes, password)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (exam.title, exam.description, exam.class_name, exam.date, exam.duration_minutes, exam.password or None),
+        """INSERT INTO exams (title, description, class_name, date, duration_minutes, password, shuffle_tasks, grading_scale)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (exam.title, exam.description, exam.class_name, exam.date, exam.duration_minutes, exam.password or None, exam.shuffle_tasks or False, grading_scale_json),
     )
     await db.commit()
     exam_id = cursor.lastrowid
     cursor = await db.execute("SELECT * FROM exams WHERE id = ?", (exam_id,))
     row = await cursor.fetchone()
-    return dict(row)
+    return _parse_exam_row(row)
 
 
 @router.put("/{exam_id}", response_model=ExamOut)
@@ -51,6 +64,10 @@ async def update_exam(
     if not updates:
         raise HTTPException(status_code=400, detail="Keine Änderungen angegeben")
 
+    # Serialize grading_scale to JSON for storage
+    if "grading_scale" in updates:
+        updates["grading_scale"] = json.dumps(updates["grading_scale"], ensure_ascii=False)
+
     set_clause = ", ".join(f"{k} = ?" for k in updates)
     values = list(updates.values()) + [exam_id]
     await db.execute(f"UPDATE exams SET {set_clause} WHERE id = ?", values)
@@ -60,7 +77,7 @@ async def update_exam(
     row = await cursor.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Klassenarbeit nicht gefunden")
-    return dict(row)
+    return _parse_exam_row(row)
 
 
 @router.delete("/{exam_id}")
@@ -89,6 +106,49 @@ async def delete_exam(
     await db.execute("DELETE FROM exams WHERE id = ?", (exam_id,))
     await db.commit()
     return {"message": "Klassenarbeit gelöscht"}
+
+
+@router.post("/{exam_id}/duplicate", response_model=ExamOut)
+async def duplicate_exam(
+    exam_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    cursor = await db.execute("SELECT * FROM exams WHERE id = ?", (exam_id,))
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Klassenarbeit nicht gefunden")
+    exam = dict(row)
+
+    cursor = await db.execute(
+        """INSERT INTO exams (title, description, class_name, duration_minutes, password, shuffle_tasks, grading_scale)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (
+            exam["title"] + " (Kopie)",
+            exam["description"],
+            exam["class_name"],
+            exam["duration_minutes"],
+            exam["password"],
+            exam.get("shuffle_tasks", False),
+            exam.get("grading_scale"),
+        ),
+    )
+    new_exam_id = cursor.lastrowid
+
+    # Copy exam_tasks
+    cursor = await db.execute(
+        "SELECT task_id, position FROM exam_tasks WHERE exam_id = ? ORDER BY position",
+        (exam_id,),
+    )
+    for et_row in await cursor.fetchall():
+        await db.execute(
+            "INSERT INTO exam_tasks (exam_id, task_id, position) VALUES (?, ?, ?)",
+            (new_exam_id, et_row[0], et_row[1]),
+        )
+
+    await db.commit()
+    cursor = await db.execute("SELECT * FROM exams WHERE id = ?", (new_exam_id,))
+    return _parse_exam_row(await cursor.fetchone())
 
 
 @router.get("/{exam_id}/tasks")

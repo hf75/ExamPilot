@@ -27,7 +27,7 @@ def _register_fonts():
         return "Helvetica", "Helvetica-Bold"
 
 
-def generate_student_pdf(student_name, exam_title, answers, total_points, max_points):
+def generate_student_pdf(student_name, exam_title, answers, total_points, max_points, grading_scale=None):
     """Generate PDF for a single student's results."""
     font, font_bold = _register_fonts()
     buffer = io.BytesIO()
@@ -45,7 +45,7 @@ def generate_student_pdf(student_name, exam_title, answers, total_points, max_po
     elements.append(Paragraph(exam_title, styles["Title2"]))
     elements.append(Spacer(1, 4 * mm))
 
-    grade, grade_label, percent = calculate_grade(total_points or 0, max_points or 1)
+    grade, grade_label, percent = calculate_grade(total_points or 0, max_points or 1, grading_scale)
     header_data = [
         ["Schueler:", student_name, "Punkte:", f"{total_points or 0} / {max_points or 0}"],
         ["", "", "Prozent:", f"{percent}%"],
@@ -88,7 +88,7 @@ def generate_student_pdf(student_name, exam_title, answers, total_points, max_po
     return buffer
 
 
-def generate_overview_pdf(exam_title, class_name, results):
+def generate_overview_pdf(exam_title, class_name, results, grading_scale=None):
     """Generate PDF overview of all students' results."""
     font, font_bold = _register_fonts()
     buffer = io.BytesIO()
@@ -111,6 +111,7 @@ def generate_overview_pdf(exam_title, class_name, results):
         grade, grade_label, percent = calculate_grade(
             r.get("total_points", 0) or 0,
             r.get("max_points", 1) or 1,
+            grading_scale,
         )
         table_data.append([
             r.get("student_name", ""),

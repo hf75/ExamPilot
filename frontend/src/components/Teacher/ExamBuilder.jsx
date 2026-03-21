@@ -72,6 +72,15 @@ export default function ExamBuilder() {
     setExams(data);
   }
 
+  async function handleDuplicate(id) {
+    try {
+      await api.post(`/api/exams/${id}/duplicate`);
+      loadExams();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
   async function handleDelete(id) {
     if (!confirm("Klassenarbeit wirklich löschen?")) return;
     await api.delete(`/api/exams/${id}`);
@@ -192,6 +201,12 @@ export default function ExamBuilder() {
               >
                 Ergebnisse
               </button>
+              <button
+                className="btn-small"
+                onClick={() => handleDuplicate(exam.id)}
+              >
+                Duplizieren
+              </button>
               {exam.status === "draft" && (
                 <button
                   className="btn-small"
@@ -235,6 +250,42 @@ export default function ExamBuilder() {
   );
 }
 
+const GRADING_PRESETS = {
+  ihk: {
+    label: "IHK (Standard)",
+    scale: [
+      { percent: 90, grade: "1", label: "sehr gut" },
+      { percent: 75, grade: "2", label: "gut" },
+      { percent: 60, grade: "3", label: "befriedigend" },
+      { percent: 45, grade: "4", label: "ausreichend" },
+      { percent: 25, grade: "5", label: "mangelhaft" },
+      { percent: 0, grade: "6", label: "ungenuegend" },
+    ],
+  },
+  linear: {
+    label: "Linear",
+    scale: [
+      { percent: 85, grade: "1", label: "sehr gut" },
+      { percent: 70, grade: "2", label: "gut" },
+      { percent: 55, grade: "3", label: "befriedigend" },
+      { percent: 40, grade: "4", label: "ausreichend" },
+      { percent: 20, grade: "5", label: "mangelhaft" },
+      { percent: 0, grade: "6", label: "ungenuegend" },
+    ],
+  },
+  strict: {
+    label: "Streng",
+    scale: [
+      { percent: 92, grade: "1", label: "sehr gut" },
+      { percent: 81, grade: "2", label: "gut" },
+      { percent: 67, grade: "3", label: "befriedigend" },
+      { percent: 50, grade: "4", label: "ausreichend" },
+      { percent: 30, grade: "5", label: "mangelhaft" },
+      { percent: 0, grade: "6", label: "ungenuegend" },
+    ],
+  },
+};
+
 function ExamForm({ exam, onSave, onCancel }) {
   const isNew = !exam;
   const [form, setForm] = useState({
@@ -244,7 +295,10 @@ function ExamForm({ exam, onSave, onCancel }) {
     date: exam?.date || "",
     duration_minutes: exam?.duration_minutes || "",
     password: exam?.password || "",
+    shuffle_tasks: exam?.shuffle_tasks || false,
   });
+  const [gradingScale, setGradingScale] = useState(exam?.grading_scale || null);
+  const [showGradingEditor, setShowGradingEditor] = useState(!!exam?.grading_scale);
   const [saving, setSaving] = useState(false);
 
   function update(field, value) {
@@ -261,6 +315,8 @@ function ExamForm({ exam, onSave, onCancel }) {
           ? parseInt(form.duration_minutes)
           : null,
         password: form.password || null,
+        shuffle_tasks: form.shuffle_tasks,
+        grading_scale: gradingScale,
       };
       if (isNew) {
         await api.post("/api/exams", payload);
@@ -336,6 +392,102 @@ function ExamForm({ exam, onSave, onCancel }) {
             rows={2}
           />
         </div>
+        <div className="form-group">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={form.shuffle_tasks}
+              onChange={(e) => update("shuffle_tasks", e.target.checked)}
+            />
+            Aufgabenreihenfolge pro Schueler zufaellig mischen (gegen Abschreiben)
+          </label>
+        </div>
+
+        <div className="form-group">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={showGradingEditor}
+              onChange={(e) => {
+                setShowGradingEditor(e.target.checked);
+                if (!e.target.checked) setGradingScale(null);
+                else if (!gradingScale) setGradingScale([...GRADING_PRESETS.ihk.scale]);
+              }}
+            />
+            Eigenen Notenschluessel verwenden (Standard: IHK)
+          </label>
+        </div>
+
+        {showGradingEditor && (
+          <div className="grading-editor">
+            <div className="grading-presets">
+              {Object.entries(GRADING_PRESETS).map(([key, preset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`btn-small ${JSON.stringify(gradingScale) === JSON.stringify(preset.scale) ? "active" : ""}`}
+                  onClick={() => setGradingScale([...preset.scale.map(s => ({...s}))])}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <table className="grading-table">
+              <thead>
+                <tr>
+                  <th>Ab %</th>
+                  <th>Note</th>
+                  <th>Bezeichnung</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(gradingScale || []).map((entry, i) => (
+                  <tr key={i}>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={entry.percent}
+                        onChange={(e) => {
+                          const next = [...gradingScale];
+                          next[i] = { ...next[i], percent: parseInt(e.target.value) || 0 };
+                          setGradingScale(next);
+                        }}
+                        style={{ width: 70 }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        value={entry.grade}
+                        onChange={(e) => {
+                          const next = [...gradingScale];
+                          next[i] = { ...next[i], grade: e.target.value };
+                          setGradingScale(next);
+                        }}
+                        style={{ width: 50 }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        value={entry.label}
+                        onChange={(e) => {
+                          const next = [...gradingScale];
+                          next[i] = { ...next[i], label: e.target.value };
+                          setGradingScale(next);
+                        }}
+                        style={{ width: 140 }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         <div className="form-actions">
           <button type="button" className="btn-secondary" onClick={onCancel}>
             Abbrechen

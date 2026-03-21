@@ -65,6 +65,14 @@ export default function Results() {
     );
   }
 
+  function handleExportCsv() {
+    const token = localStorage.getItem("teacher_token");
+    window.open(
+      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/exams/${examId}/export/csv?token=${token}`,
+      "_blank"
+    );
+  }
+
   if (loading) return <p>Laden...</p>;
 
   return (
@@ -83,6 +91,9 @@ export default function Results() {
         <div className="header-actions">
           <button className="btn-secondary" onClick={handleClassAnalysis}>
             Klassen-Analyse
+          </button>
+          <button className="btn-secondary" onClick={handleExportCsv}>
+            CSV exportieren
           </button>
           <button className="btn-secondary" onClick={handleExportPdf}>
             PDF exportieren

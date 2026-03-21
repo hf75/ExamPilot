@@ -16,6 +16,7 @@ export default function ExamView() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
   const [saveErrors, setSaveErrors] = useState([]);
+  const [flagged, setFlagged] = useState(new Set());
   const autoSaveTimer = useRef(null);
   const isSubmittingRef = useRef(false);
 
@@ -113,6 +114,18 @@ export default function ExamView() {
     }
 
     setCurrentTaskIndex(newIndex);
+  }
+
+  function toggleFlag(taskId) {
+    setFlagged(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
   }
 
   function handleAnswerChange(taskId, value) {
@@ -235,7 +248,9 @@ export default function ExamView() {
           tasks={tasks}
           currentIndex={currentTaskIndex}
           answers={answers}
+          flagged={flagged}
           onSelect={handleNavigate}
+          onToggleFlag={toggleFlag}
         />
 
         <div className={`exam-main ${currentTask?.task_type === "drawing" || currentTask?.task_type === "webapp" || currentTask?.task_type === "feynman" || currentTask?.task_type === "scenario" ? "exam-main-drawing" : ""}`}>
@@ -249,6 +264,13 @@ export default function ExamView() {
                           {currentTask.points} Pkt.
                         </span>
                       </h3>
+                      <button
+                        className={`btn-flag ${flagged.has(currentTask.id) ? "flagged" : ""}`}
+                        onClick={() => toggleFlag(currentTask.id)}
+                        title={flagged.has(currentTask.id) ? "Markierung entfernen" : "Zum Nochmal-Anschauen markieren"}
+                      >
+                        &#9873; {flagged.has(currentTask.id) ? "Markiert" : "Markieren"}
+                      </button>
                     </div>
                     <div className="task-text-exam"><Markdown>{currentTask.text}</Markdown></div>
 
@@ -296,6 +318,13 @@ export default function ExamView() {
                         </span>
                       )}
                     </h3>
+                    <button
+                      className={`btn-flag ${flagged.has(currentTask.id) ? "flagged" : ""}`}
+                      onClick={() => toggleFlag(currentTask.id)}
+                      title={flagged.has(currentTask.id) ? "Markierung entfernen" : "Zum Nochmal-Anschauen markieren"}
+                    >
+                      &#9873; {flagged.has(currentTask.id) ? "Markiert" : "Markieren"}
+                    </button>
                   </div>
                   {currentTask.task_type !== "cloze" && (
                     <div className="task-text-exam"><Markdown>{currentTask.text}</Markdown></div>
@@ -361,6 +390,11 @@ export default function ExamView() {
               <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
                 {answeredCount} von {tasks.length} Aufgaben beantwortet.
               </p>
+              {flagged.size > 0 && (
+                <p style={{ color: "#b45309", fontSize: 14 }}>
+                  &#9873; {flagged.size} Aufgabe(n) noch als "Nochmal anschauen" markiert.
+                </p>
+              )}
               <div className="modal-actions" style={{ marginTop: 20 }}>
                 <button
                   className="btn-secondary"

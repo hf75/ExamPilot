@@ -84,6 +84,7 @@ export default function TaskPool() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [filter, setFilter] = useState("");
+  const [movingTask, setMovingTask] = useState(null);
   const [renamingPool, setRenamingPool] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [newPoolName, setNewPoolName] = useState("");
@@ -153,6 +154,28 @@ export default function TaskPool() {
     await api.delete(`/api/tasks/${id}`);
     loadTasks();
     loadPools();
+  }
+
+  async function handleDuplicate(id) {
+    try {
+      await api.post(`/api/tasks/${id}/duplicate`);
+      loadTasks();
+      loadPools();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function handleMoveTask(taskId, targetPoolId) {
+    if (!targetPoolId) return;
+    try {
+      await api.put(`/api/tasks/${taskId}/move`, { pool_id: targetPoolId });
+      setMovingTask(null);
+      loadTasks();
+      loadPools();
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   async function handleAiEdit(task) {
@@ -411,6 +434,17 @@ export default function TaskPool() {
                 >
                   KI bearbeiten
                 </button>
+                <button className="btn-small" onClick={() => handleDuplicate(task.id)}>
+                  Duplizieren
+                </button>
+                {pools.length > 1 && (
+                  <button
+                    className="btn-small"
+                    onClick={() => setMovingTask(movingTask === task.id ? null : task.id)}
+                  >
+                    Verschieben
+                  </button>
+                )}
                 <button
                   className="btn-small btn-danger"
                   onClick={() => handleDelete(task.id)}
@@ -418,6 +452,22 @@ export default function TaskPool() {
                   Löschen
                 </button>
               </div>
+
+              {movingTask === task.id && (
+                <div className="move-task-bar">
+                  <span>Verschieben nach:</span>
+                  <select
+                    onChange={(e) => handleMoveTask(task.id, parseInt(e.target.value))}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Pool wählen...</option>
+                    {pools.filter(p => p.id !== selectedPoolId).map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <button className="btn-small" onClick={() => setMovingTask(null)}>Abbrechen</button>
+                </div>
+              )}
 
               {aiEditTask?.id === task.id && (
                 <div className="ai-edit-bar">

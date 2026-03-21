@@ -158,6 +158,18 @@ async def init_db():
             default_pool_id = default_pool[0]
         await db.execute("UPDATE tasks SET pool_id = ? WHERE pool_id IS NULL", (default_pool_id,))
 
+        # Migration: shuffle_tasks option for exams
+        try:
+            await db.execute("ALTER TABLE exams ADD COLUMN shuffle_tasks BOOLEAN DEFAULT FALSE")
+        except Exception:
+            pass
+
+        # Migration: custom grading scale per exam (JSON)
+        try:
+            await db.execute("ALTER TABLE exams ADD COLUMN grading_scale TEXT")
+        except Exception:
+            pass
+
         # Migration: class analysis cache
         await db.execute("""
             CREATE TABLE IF NOT EXISTS class_analyses (

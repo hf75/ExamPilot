@@ -7,7 +7,7 @@ import aiosqlite
 from database import get_db
 from models import AnswerAdjust
 from routers.auth import require_teacher
-from services.grading import calculate_grade
+from services.grading import calculate_grade, parse_scale
 from services.claude_service import analyze_class_weaknesses
 
 router = APIRouter(prefix="/api/exams", tags=["results"])
@@ -25,6 +25,15 @@ async def get_exam_results(
         raise HTTPException(status_code=404, detail="Klassenarbeit nicht gefunden")
     exam = dict(exam)
 
+    # Parse custom grading scale if set
+    scale_json = exam.get("grading_scale")
+    custom_scale = None
+    if scale_json:
+        try:
+            custom_scale = parse_scale(json.loads(scale_json) if isinstance(scale_json, str) else scale_json)
+        except Exception:
+            pass
+
     cursor = await db.execute(
         """SELECT es.id as session_id, es.total_points, es.max_points, es.status,
                   es.started_at, es.submitted_at, s.name as student_name, s.id as student_id
@@ -39,7 +48,7 @@ async def get_exam_results(
     # Add grade and dispute count to each session
     for s in sessions:
         if s["total_points"] is not None and s["max_points"]:
-            grade, label, percent = calculate_grade(s["total_points"], s["max_points"])
+            grade, label, percent = calculate_grade(s["total_points"], s["max_points"], custom_scale)
             s["grade"] = grade
             s["grade_label"] = label
             s["percent"] = percent
@@ -69,7 +78,8 @@ async def get_student_result(
     _: bool = Depends(require_teacher),
 ):
     cursor = await db.execute(
-        """SELECT es.*, e.title as exam_title, s.name as student_name
+        """SELECT es.*, e.title as exam_title, e.grading_scale as exam_grading_scale,
+                  s.name as student_name
            FROM exam_sessions es
            JOIN exams e ON e.id = es.exam_id
            JOIN students s ON s.id = es.student_id
@@ -80,6 +90,15 @@ async def get_student_result(
     if not session:
         raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
     session = dict(session)
+
+    # Parse custom grading scale
+    scale_json = session.pop("exam_grading_scale", None)
+    custom_scale = None
+    if scale_json:
+        try:
+            custom_scale = parse_scale(json.loads(scale_json) if isinstance(scale_json, str) else scale_json)
+        except Exception:
+            pass
 
     cursor = await db.execute(
         """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points,
@@ -94,7 +113,6 @@ async def get_student_result(
         a = dict(row)
         if a.get("task_type") == "webapp" and a.get("question_data"):
             try:
-                import json
                 qd = json.loads(a["question_data"]) if isinstance(a["question_data"], str) else a["question_data"]
                 a["app_html"] = qd.get("app_html", "")
             except Exception:
@@ -105,6 +123,7 @@ async def get_student_result(
     grade, label, percent = calculate_grade(
         session.get("total_points", 0) or 0,
         session.get("max_points", 1) or 1,
+        custom_scale,
     )
 
     return {

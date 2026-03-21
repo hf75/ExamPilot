@@ -1,6 +1,7 @@
 import json
 import asyncio
 import logging
+import random
 from fastapi import APIRouter, Depends, HTTPException
 import aiosqlite
 
@@ -107,6 +108,13 @@ async def get_session(
     if session_dict["exam_status"] != "active" and session_dict["status"] == "in_progress":
         session_dict["status"] = "closed"
 
+    # Check if exam has shuffle enabled
+    exam_cursor = await db.execute(
+        "SELECT shuffle_tasks FROM exams WHERE id = ?", (session_dict["exam_id"],)
+    )
+    exam_row = await exam_cursor.fetchone()
+    shuffle_enabled = bool(exam_row and exam_row[0])
+
     # Get tasks for this exam
     cursor = await db.execute(
         """SELECT t.*, et.position FROM exam_tasks et
@@ -116,6 +124,12 @@ async def get_session(
         (session_dict["exam_id"],),
     )
     tasks_raw = [dict(row) for row in await cursor.fetchall()]
+
+    # Shuffle tasks deterministically per session (same student always sees same order)
+    if shuffle_enabled and len(tasks_raw) > 1:
+        rng = random.Random(session_id)
+        rng.shuffle(tasks_raw)
+
     # Parse question_data and strip sensitive fields so students can't see solutions
     tasks = []
     for t in tasks_raw:
@@ -604,7 +618,8 @@ async def get_results(
     session_id: int, db: aiosqlite.Connection = Depends(get_db)
 ):
     cursor = await db.execute(
-        """SELECT es.*, e.title as exam_title, e.show_results_immediately, s.name as student_name
+        """SELECT es.*, e.title as exam_title, e.show_results_immediately, e.grading_scale,
+                  s.name as student_name
            FROM exam_sessions es
            JOIN exams e ON e.id = es.exam_id
            JOIN students s ON s.id = es.student_id
@@ -640,10 +655,18 @@ async def get_results(
         a.pop("question_data", None)
         answers.append(a)
 
-    from services.grading import calculate_grade
+    from services.grading import calculate_grade, parse_scale
+    # Parse custom grading scale
+    scale_json = session_dict.get("grading_scale")
+    custom_scale = None
+    if scale_json:
+        try:
+            custom_scale = parse_scale(json.loads(scale_json) if isinstance(scale_json, str) else scale_json)
+        except Exception:
+            pass
     total = session_dict["total_points"] or 0
     max_pts = session_dict["max_points"] or 1
-    grade, grade_label, percent = calculate_grade(total, max_pts)
+    grade, grade_label, percent = calculate_grade(total, max_pts, custom_scale)
 
     return {
         "student_name": session_dict["student_name"],

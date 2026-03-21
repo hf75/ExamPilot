@@ -13,16 +13,34 @@ else:
     APP_DIR = Path(__file__).resolve().parent
     BUNDLE_DIR = APP_DIR
 
-load_dotenv(APP_DIR / ".env")
+# Load .env but don't override existing system environment variables
+load_dotenv(APP_DIR / ".env", override=False)
 
 BASE_DIR = APP_DIR
 DB_PATH = APP_DIR / "exam_tool.db"
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+# Placeholder values that indicate the key is not configured
+_PLACEHOLDERS = {
+    "your-api-key-here",
+    "sk-ant-xxxxx",
+    "change-this-to-a-random-secret-key",
+    "",
+}
+
+
+def _resolve_env(name: str, fallback: str = "") -> str:
+    """Get env var, treating placeholder values as unset."""
+    value = os.getenv(name, "").strip()
+    if value.lower() in {p.lower() for p in _PLACEHOLDERS}:
+        return fallback
+    return value
+
+
+ANTHROPIC_API_KEY = _resolve_env("ANTHROPIC_API_KEY")
 CLAUDE_MODEL = "claude-sonnet-4-6"
 CLAUDE_MAX_TOKENS = 1000
 
 TEACHER_PASSWORD_HASH_KEY = "teacher_password_hash"
 
-SECRET_KEY = os.getenv("SECRET_KEY", "exam-pilot-secret-key-change-me")
+SECRET_KEY = _resolve_env("SECRET_KEY", "exam-pilot-secret-key-change-me")
 TOKEN_EXPIRE_HOURS = 12

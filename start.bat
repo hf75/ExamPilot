@@ -27,13 +27,26 @@ if not exist "backend\venv" (
     call backend\venv\Scripts\activate.bat
 )
 
-REM Check if .env exists
+REM Check if .env exists, create template if not
 if not exist "backend\.env" (
-    echo.
-    echo WICHTIG: Bitte trage deinen Anthropic API-Key in backend\.env ein!
-    echo Erstelle .env Datei...
     echo ANTHROPIC_API_KEY=your-api-key-here> backend\.env
     echo SECRET_KEY=change-this-to-a-random-secret-key>> backend\.env
+)
+
+REM Check if API key is configured (env var or .env)
+set "HAS_KEY=0"
+if defined ANTHROPIC_API_KEY (
+    set "HAS_KEY=1"
+)
+if "%HAS_KEY%"=="0" (
+    findstr /C:"your-api-key-here" "backend\.env" >nul 2>&1
+    if errorlevel 1 set "HAS_KEY=1"
+)
+if "%HAS_KEY%"=="0" (
+    echo.
+    echo WICHTIG: Kein API-Key konfiguriert!
+    echo Option 1: setx ANTHROPIC_API_KEY "sk-ant-..."
+    echo Option 2: Key in backend\.env eintragen
     echo.
 )
 

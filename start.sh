@@ -35,13 +35,25 @@ else
     source backend/venv/bin/activate
 fi
 
-# Check if .env exists
+# Check if .env exists, create template if not
 if [ ! -f "backend/.env" ]; then
-    echo ""
-    echo "WICHTIG: Bitte trage deinen Anthropic API-Key in backend/.env ein!"
-    echo "Erstelle .env Datei..."
     echo "ANTHROPIC_API_KEY=your-api-key-here" > backend/.env
     echo "SECRET_KEY=change-this-to-a-random-secret-key" >> backend/.env
+fi
+
+# Check if API key is configured (env var or .env)
+HAS_KEY=0
+if [ -n "$ANTHROPIC_API_KEY" ]; then
+    HAS_KEY=1
+fi
+if [ "$HAS_KEY" = "0" ] && ! grep -q "your-api-key-here" backend/.env 2>/dev/null; then
+    HAS_KEY=1
+fi
+if [ "$HAS_KEY" = "0" ]; then
+    echo ""
+    echo "WICHTIG: Kein API-Key konfiguriert!"
+    echo "Option 1: export ANTHROPIC_API_KEY=\"sk-ant-...\""
+    echo "Option 2: Key in backend/.env eintragen"
     echo ""
 fi
 

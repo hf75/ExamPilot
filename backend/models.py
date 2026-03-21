@@ -83,6 +83,8 @@ class ExamCreate(BaseModel):
     date: Optional[str] = None
     duration_minutes: Optional[int] = None
     password: Optional[str] = None
+    shuffle_tasks: Optional[bool] = False
+    grading_scale: Optional[list[dict]] = None
 
 class ExamUpdate(BaseModel):
     title: Optional[str] = None
@@ -93,6 +95,8 @@ class ExamUpdate(BaseModel):
     status: Optional[str] = None
     show_results_immediately: Optional[bool] = None
     password: Optional[str] = None
+    shuffle_tasks: Optional[bool] = None
+    grading_scale: Optional[list[dict]] = None
 
 class ExamOut(BaseModel):
     id: int
@@ -104,6 +108,8 @@ class ExamOut(BaseModel):
     status: str
     show_results_immediately: Optional[bool] = True
     password: Optional[str] = None
+    shuffle_tasks: Optional[bool] = False
+    grading_scale: Optional[list[dict]] = None
     created_at: Optional[str] = None
 
 

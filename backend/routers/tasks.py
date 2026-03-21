@@ -127,6 +127,65 @@ async def delete_task(
     return {"message": "Aufgabe gelöscht"}
 
 
+@router.post("/{task_id}/duplicate", response_model=TaskOut)
+async def duplicate_task(
+    task_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    cursor = await db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Aufgabe nicht gefunden")
+    task = dict(row)
+
+    cursor = await db.execute(
+        """INSERT INTO tasks (title, text, hint, solution, topic, task_type, points, parent_task_id, source, question_data, pool_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            task["title"] + " (Kopie)",
+            task["text"],
+            task["hint"],
+            task["solution"],
+            task["topic"],
+            task["task_type"],
+            task["points"],
+            task_id,
+            task["source"],
+            task["question_data"],
+            task["pool_id"],
+        ),
+    )
+    await db.commit()
+    new_id = cursor.lastrowid
+    cursor = await db.execute("SELECT * FROM tasks WHERE id = ?", (new_id,))
+    return _row_to_task(await cursor.fetchone())
+
+
+@router.put("/{task_id}/move")
+async def move_task(
+    task_id: int,
+    body: dict,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    pool_id = body.get("pool_id")
+    if pool_id is None:
+        raise HTTPException(status_code=400, detail="pool_id erforderlich")
+
+    cursor = await db.execute("SELECT id FROM task_pools WHERE id = ?", (pool_id,))
+    if not await cursor.fetchone():
+        raise HTTPException(status_code=404, detail="Ziel-Pool nicht gefunden")
+
+    cursor = await db.execute("SELECT id FROM tasks WHERE id = ?", (task_id,))
+    if not await cursor.fetchone():
+        raise HTTPException(status_code=404, detail="Aufgabe nicht gefunden")
+
+    await db.execute("UPDATE tasks SET pool_id = ? WHERE id = ?", (pool_id, task_id))
+    await db.commit()
+    return {"message": "Aufgabe verschoben"}
+
+
 @router.post("/import-document")
 async def import_document_endpoint(
     file: UploadFile = File(...),
