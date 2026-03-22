@@ -41,6 +41,24 @@ CLAUDE_MODEL = "claude-sonnet-4-6"
 CLAUDE_MAX_TOKENS = 1000
 
 TEACHER_PASSWORD_HASH_KEY = "teacher_password_hash"
+API_KEY_SETTINGS_KEY = "anthropic_api_key"
+
+
+def get_active_api_key() -> str:
+    """Return the API key: DB setting takes priority over env variable."""
+    import sqlite3
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        cursor = conn.execute(
+            "SELECT value FROM settings WHERE key = ?", (API_KEY_SETTINGS_KEY,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0] and row[0].strip():
+            return row[0].strip()
+    except Exception:
+        pass
+    return ANTHROPIC_API_KEY
 
 SECRET_KEY = _resolve_env("SECRET_KEY", "exam-pilot-secret-key-change-me")
 TOKEN_EXPIRE_HOURS = 12

@@ -4543,6 +4543,53 @@ a:hover {
   margin-bottom: 16px;
 }
 
+.settings-api-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-api-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 10px;
+}
+
+.settings-api-badge.active {
+  background: rgba(34, 197, 94, 0.1);
+  color: #166534;
+}
+
+.settings-api-badge.inactive {
+  background: rgba(239, 68, 68, 0.1);
+  color: #991b1b;
+}
+
+.settings-api-masked {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background: var(--bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.settings-api-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.settings-api-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-family: monospace;
+}
+
 /* Toast Notifications */
 .toast-container {
   position: fixed;

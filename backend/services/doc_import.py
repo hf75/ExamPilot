@@ -12,18 +12,21 @@ import asyncio
 import io
 
 from anthropic import Anthropic
-from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+from config import CLAUDE_MODEL, get_active_api_key
 
 # Rate limiting
 _semaphore = asyncio.Semaphore(2)
 
 _client = None
+_client_key = None
 
 
 def _get_client():
-    global _client
-    if _client is None:
-        _client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    global _client, _client_key
+    key = get_active_api_key()
+    if _client is None or key != _client_key:
+        _client = Anthropic(api_key=key)
+        _client_key = key
     return _client
 
 

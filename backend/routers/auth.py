@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import aiosqlite
 
-from config import SECRET_KEY, TOKEN_EXPIRE_HOURS, TEACHER_PASSWORD_HASH_KEY
+from config import SECRET_KEY, TOKEN_EXPIRE_HOURS, TEACHER_PASSWORD_HASH_KEY, API_KEY_SETTINGS_KEY, get_active_api_key
 from database import get_db
 from models import LoginRequest, SetupPasswordRequest, TokenResponse
 
@@ -99,12 +99,23 @@ async def get_settings(
     db: aiosqlite.Connection = Depends(get_db),
     _: bool = Depends(require_teacher),
 ):
-    """Get all teacher settings (excluding password hash)."""
+    """Get all teacher settings (excluding sensitive values)."""
     cursor = await db.execute(
-        "SELECT key, value FROM settings WHERE key != ?", (TEACHER_PASSWORD_HASH_KEY,)
+        "SELECT key, value FROM settings WHERE key NOT IN (?, ?)",
+        (TEACHER_PASSWORD_HASH_KEY, API_KEY_SETTINGS_KEY),
     )
     rows = await cursor.fetchall()
-    return {row[0]: row[1] for row in rows}
+    result = {row[0]: row[1] for row in rows}
+
+    # Add masked API key info
+    active_key = get_active_api_key()
+    if active_key:
+        result["api_key_masked"] = active_key[:8] + "..." + active_key[-4:]
+        result["api_key_set"] = True
+    else:
+        result["api_key_masked"] = ""
+        result["api_key_set"] = False
+    return result
 
 
 @router.put("/settings")

@@ -3,19 +3,22 @@ import re
 import asyncio
 from anthropic import Anthropic
 
-from config import ANTHROPIC_API_KEY, CLAUDE_MODEL, CLAUDE_MAX_TOKENS
+from config import CLAUDE_MODEL, CLAUDE_MAX_TOKENS, get_active_api_key
 
 # Rate limiting: simple semaphore for max 2 concurrent calls
 _semaphore = asyncio.Semaphore(2)
 
-client = None
+_client = None
+_client_key = None
 
 
 def get_client():
-    global client
-    if client is None:
-        client = Anthropic(api_key=ANTHROPIC_API_KEY)
-    return client
+    global _client, _client_key
+    key = get_active_api_key()
+    if _client is None or key != _client_key:
+        _client = Anthropic(api_key=key)
+        _client_key = key
+    return _client
 
 
 def _parse_json_response(text: str) -> dict | list:
