@@ -60,15 +60,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM === Create .env template in output ===
-if not exist "dist\ExamPilot\.env" (
-    echo ANTHROPIC_API_KEY=your-api-key-here> "dist\ExamPilot\.env"
-    echo SECRET_KEY=change-this-to-a-random-secret-key>> "dist\ExamPilot\.env"
-)
-
-REM === Copy start script ===
-copy /Y "start_portable.bat" "dist\ExamPilot\Starten.bat" >nul
-
 echo.
 echo ============================================
 echo   Build erfolgreich!
@@ -79,8 +70,8 @@ echo.
 echo   Diesen Ordner auf einen USB-Stick kopieren
 echo   oder als ZIP weitergeben.
 echo.
-echo   Vor dem Start: API-Key in .env eintragen!
-echo   Dann: Starten.bat ausfuehren.
+echo   Starten: ExamPilot.exe ausfuehren.
+echo   API-Key ueber Einstellungen im Browser eingeben.
 echo ============================================
 echo.
 pause
