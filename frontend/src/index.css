@@ -2530,6 +2530,39 @@ a:hover {
   font-size: 0.85rem;
 }
 
+.preview-solutions-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.preview-solutions-toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.preview-solution {
+  background: rgba(34, 197, 94, 0.08);
+  border-left: 4px solid var(--accent);
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  margin-top: 12px;
+  font-size: 0.95rem;
+}
+
+.preview-solution strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+
 /* Drawing Canvas */
 .question-drawing {
   display: flex;

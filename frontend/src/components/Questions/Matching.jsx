@@ -29,6 +29,15 @@ export default function Matching({ task, questionData, answer, onChange, disable
   }, [task.id, pairs.length, questionData.shuffle]);
 
   useEffect(() => {
+    try {
+      const parsed = JSON.parse(answer || "{}");
+      if (typeof parsed === "object" && !Array.isArray(parsed) && JSON.stringify(parsed) !== JSON.stringify(selections)) {
+        setSelections(parsed);
+      }
+    } catch {}
+  }, [answer]);
+
+  useEffect(() => {
     onChange(JSON.stringify(selections));
   }, [selections]);
 

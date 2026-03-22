@@ -13,6 +13,15 @@ export default function Cloze({ task, questionData, answer, onChange, disabled }
   });
 
   useEffect(() => {
+    try {
+      const parsed = JSON.parse(answer || "[]");
+      if (Array.isArray(parsed) && JSON.stringify(parsed) !== JSON.stringify(gapAnswers)) {
+        setGapAnswers(parsed);
+      }
+    } catch {}
+  }, [answer]);
+
+  useEffect(() => {
     onChange(JSON.stringify(gapAnswers));
   }, [gapAnswers]);
 

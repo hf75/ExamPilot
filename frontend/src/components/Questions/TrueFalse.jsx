@@ -4,6 +4,10 @@ export default function TrueFalse({ task, questionData, answer, onChange, disabl
   const [selected, setSelected] = useState(answer || "");
 
   useEffect(() => {
+    if (answer !== selected) setSelected(answer || "");
+  }, [answer]);
+
+  useEffect(() => {
     if (selected) onChange(selected);
   }, [selected]);
 

@@ -32,7 +32,7 @@ const COMPONENTS = {
   photo: Photo,
 };
 
-export default function QuestionRenderer({ task, answer, onChange, disabled, sessionId }) {
+export default function QuestionRenderer({ task, answer, onChange, disabled, sessionId, preview }) {
   const Component = COMPONENTS[task.task_type] || Essay;
 
   return (
@@ -44,6 +44,7 @@ export default function QuestionRenderer({ task, answer, onChange, disabled, ses
         onChange={onChange}
         disabled={disabled}
         sessionId={sessionId}
+        preview={preview}
       />
     </div>
   );

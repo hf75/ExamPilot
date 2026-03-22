@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { api } from "../../api/client";
 import Markdown from "../Markdown";
 
-export default function Scenario({ task, questionData, answer, onChange, disabled, sessionId }) {
+export default function Scenario({ task, questionData, answer, onChange, disabled, sessionId, preview }) {
   const [transcript, setTranscript] = useState(() => {
     try { return answer ? JSON.parse(answer) : []; }
     catch { return []; }
@@ -47,12 +47,11 @@ export default function Scenario({ task, questionData, answer, onChange, disable
   async function startScenario() {
     setLoading(true);
     try {
-      const result = await api.post("/api/student/scenario-next", {
-        session_id: sessionId,
-        task_id: task.id,
-        transcript: [],
-        chosen_option: null,
-      });
+      const endpoint = preview ? "/api/exams/preview/scenario-next" : "/api/student/scenario-next";
+      const payload = preview
+        ? { task_id: task.id, transcript: [], chosen_option: null }
+        : { session_id: sessionId, task_id: task.id, transcript: [], chosen_option: null };
+      const result = await api.post(endpoint, payload);
 
       const entry = { role: "situation", content: result.situation, data: result };
       const newTranscript = [entry];
@@ -83,12 +82,11 @@ export default function Scenario({ task, questionData, answer, onChange, disable
     setLoading(true);
 
     try {
-      const result = await api.post("/api/student/scenario-next", {
-        session_id: sessionId,
-        task_id: task.id,
-        transcript: updatedTranscript,
-        chosen_option: optionIndex,
-      });
+      const endpoint = preview ? "/api/exams/preview/scenario-next" : "/api/student/scenario-next";
+      const payload = preview
+        ? { task_id: task.id, transcript: updatedTranscript, chosen_option: optionIndex }
+        : { session_id: sessionId, task_id: task.id, transcript: updatedTranscript, chosen_option: optionIndex };
+      const result = await api.post(endpoint, payload);
 
       const situationEntry = { role: "situation", content: result.situation, data: result };
       const finalTranscript = [...updatedTranscript, situationEntry];

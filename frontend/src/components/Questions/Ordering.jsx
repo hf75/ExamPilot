@@ -22,6 +22,15 @@ export default function Ordering({ task, questionData, answer, onChange, disable
   });
 
   useEffect(() => {
+    try {
+      const parsed = JSON.parse(answer || "null");
+      if (Array.isArray(parsed) && parsed.length === items.length && JSON.stringify(parsed) !== JSON.stringify(order)) {
+        setOrder(parsed);
+      }
+    } catch {}
+  }, [answer]);
+
+  useEffect(() => {
     onChange(JSON.stringify(order));
   }, [order]);
 

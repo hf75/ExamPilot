@@ -4,10 +4,12 @@ import tempfile
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import Optional, List
 import aiosqlite
+from pydantic import BaseModel
 
 from database import get_db
 from models import ExamCreate, ExamUpdate, ExamOut
 from routers.auth import require_teacher
+from services.claude_service import feynman_respond, scenario_respond
 
 router = APIRouter(prefix="/api/exams", tags=["exams"])
 
@@ -263,6 +265,103 @@ async def preview_exam(
         "tasks": tasks,
         "answers": [],
     }
+
+
+class PreviewFeynmanRequest(BaseModel):
+    task_id: int
+    messages: list[dict]
+
+
+class PreviewScenarioRequest(BaseModel):
+    task_id: int
+    transcript: list[dict]
+    chosen_option: int | None = None
+
+
+@router.post("/preview/feynman-chat")
+async def preview_feynman_chat(
+    req: PreviewFeynmanRequest,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Feynman chat for teacher preview — no session required."""
+    cursor = await db.execute("SELECT * FROM tasks WHERE id = ?", (req.task_id,))
+    task_row = await cursor.fetchone()
+    if not task_row:
+        raise HTTPException(status_code=404, detail="Aufgabe nicht gefunden")
+    task = dict(task_row)
+
+    if task["task_type"] != "feynman":
+        raise HTTPException(status_code=400, detail="Keine Feynman-Aufgabe")
+
+    qd = task.get("question_data", "{}")
+    try:
+        question_data = json.loads(qd) if isinstance(qd, str) else (qd or {})
+    except (json.JSONDecodeError, TypeError):
+        question_data = {}
+
+    concept = question_data.get("concept", "")
+    context = question_data.get("context", "")
+    max_turns = question_data.get("max_turns", 10)
+
+    student_messages = [m for m in req.messages if m.get("role") == "student"]
+    if len(student_messages) > max_turns:
+        raise HTTPException(status_code=400, detail="Maximale Anzahl Nachrichten erreicht")
+
+    is_last_turn = len(student_messages) >= max_turns
+
+    response = await feynman_respond(
+        concept=concept,
+        context=context,
+        task_text=task["text"],
+        messages=req.messages,
+        is_last_turn=is_last_turn,
+    )
+
+    return {"response": response}
+
+
+@router.post("/preview/scenario-next")
+async def preview_scenario_next(
+    req: PreviewScenarioRequest,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Scenario branching for teacher preview — no session required."""
+    cursor = await db.execute("SELECT * FROM tasks WHERE id = ?", (req.task_id,))
+    task_row = await cursor.fetchone()
+    if not task_row:
+        raise HTTPException(status_code=404, detail="Aufgabe nicht gefunden")
+    task = dict(task_row)
+
+    if task["task_type"] != "scenario":
+        raise HTTPException(status_code=400, detail="Keine Szenario-Aufgabe")
+
+    qd = task.get("question_data", "{}")
+    try:
+        question_data = json.loads(qd) if isinstance(qd, str) else (qd or {})
+    except (json.JSONDecodeError, TypeError):
+        question_data = {}
+
+    scenario_description = question_data.get("scenario_description", "")
+    context = question_data.get("context", "")
+    max_decisions = question_data.get("max_decisions", 5)
+
+    decisions_made = len([e for e in req.transcript if e.get("role") == "decision"])
+    if decisions_made > max_decisions:
+        raise HTTPException(status_code=400, detail="Maximale Entscheidungen erreicht")
+
+    is_last_decision = decisions_made >= max_decisions
+
+    result = await scenario_respond(
+        scenario_description=scenario_description,
+        context=context,
+        task_text=task["text"],
+        transcript=req.transcript,
+        is_last_decision=is_last_decision,
+    )
+
+    return result
 
 
 @router.post("/generate-adhoc")

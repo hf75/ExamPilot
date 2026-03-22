@@ -12,6 +12,7 @@ export default function ExamPreview() {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
+  const [showSolutions, setShowSolutions] = useState(false);
 
   useEffect(() => {
     loadPreview();
@@ -30,7 +31,9 @@ export default function ExamPreview() {
   }
 
   function handleAnswerChange(taskId, value) {
-    setAnswers((prev) => ({ ...prev, [taskId]: value }));
+    if (!showSolutions) {
+      setAnswers((prev) => ({ ...prev, [taskId]: value }));
+    }
   }
 
   if (loading) {
@@ -58,6 +61,58 @@ export default function ExamPreview() {
     (k) => answers[k] && answers[k] !== "" && answers[k] !== "[]" && answers[k] !== "{}"
   ).length;
 
+  function getCorrectAnswer(task) {
+    const qd = task.question_data || {};
+    switch (task.task_type) {
+      case "multichoice": {
+        const indices = (qd.answers || [])
+          .map((a, i) => (a.fraction >= 100 ? i : -1))
+          .filter((i) => i >= 0);
+        return JSON.stringify(indices);
+      }
+      case "truefalse":
+        return String(qd.correct_answer ?? "true");
+      case "shortanswer": {
+        const best = (qd.answers || []).find((a) => a.fraction >= 100);
+        return best ? best.text : "";
+      }
+      case "numerical": {
+        const best = (qd.answers || []).find((a) => a.fraction >= 100);
+        return best ? String(best.value) : "";
+      }
+      case "matching": {
+        const map = {};
+        (qd.pairs || []).forEach((p, i) => { map[String(i)] = p.answer; });
+        return JSON.stringify(map);
+      }
+      case "ordering": {
+        const indices = (qd.items || []).map((_, i) => i);
+        return JSON.stringify(indices);
+      }
+      case "cloze": {
+        const gapAnswers = (qd.gaps || []).map((gap) => {
+          if (gap.type === "multichoice") {
+            const idx = (gap.answers || []).findIndex((a) => a.fraction >= 100);
+            return String(idx >= 0 ? idx : 0);
+          }
+          const best = (gap.answers || []).find((a) => a.fraction >= 100);
+          return best ? best.text : "";
+        });
+        return JSON.stringify(gapAnswers);
+      }
+      default:
+        return null;
+    }
+  }
+
+  function getEffectiveAnswer(task) {
+    if (showSolutions) {
+      const correct = getCorrectAnswer(task);
+      if (correct !== null) return correct;
+    }
+    return answers[task.id] || "";
+  }
+
   function formatTime(seconds) {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -80,6 +135,14 @@ export default function ExamPreview() {
           <span className="exam-progress">
             {answeredCount}/{tasks.length} beantwortet
           </span>
+          <label className="preview-solutions-toggle">
+            <input
+              type="checkbox"
+              checked={showSolutions}
+              onChange={(e) => setShowSolutions(e.target.checked)}
+            />
+            Lösungen anzeigen
+          </label>
           <button
             className="btn-secondary"
             onClick={() => navigate("/teacher/exams")}
@@ -111,6 +174,13 @@ export default function ExamPreview() {
                 </div>
                 <div className="task-text-exam"><Markdown>{currentTask.text}</Markdown></div>
 
+                {showSolutions && currentTask.solution && (
+                  <div className="preview-solution">
+                    <strong>Musterlösung:</strong>
+                    <Markdown>{currentTask.solution}</Markdown>
+                  </div>
+                )}
+
                 <div className="task-nav-buttons">
                   <button
                     className="btn-secondary"
@@ -137,9 +207,10 @@ export default function ExamPreview() {
               <div className="drawing-split-right">
                 <QuestionRenderer
                   task={currentTask}
-                  answer={answers[currentTask.id] || ""}
+                  answer={getEffectiveAnswer(currentTask)}
                   onChange={(value) => handleAnswerChange(currentTask.id, value)}
-                  disabled={false}
+                  disabled={showSolutions && getCorrectAnswer(currentTask) !== null}
+                  preview
                 />
               </div>
             </div>
@@ -161,10 +232,17 @@ export default function ExamPreview() {
 
               <QuestionRenderer
                 task={currentTask}
-                answer={answers[currentTask.id] || ""}
+                answer={getEffectiveAnswer(currentTask)}
                 onChange={(value) => handleAnswerChange(currentTask.id, value)}
-                disabled={false}
+                disabled={showSolutions && getCorrectAnswer(currentTask) !== null}
               />
+
+              {showSolutions && currentTask.solution && (
+                <div className="preview-solution">
+                  <strong>Musterlösung:</strong>
+                  <Markdown>{currentTask.solution}</Markdown>
+                </div>
+              )}
 
               <div className="task-nav-buttons">
                 <button

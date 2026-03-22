@@ -29,6 +29,15 @@ export default function MultiChoice({ task, questionData, answer, onChange, disa
   }, [task.id, answers.length, questionData.shuffle]);
 
   useEffect(() => {
+    try {
+      const parsed = JSON.parse(answer || "[]");
+      if (Array.isArray(parsed) && JSON.stringify(parsed) !== JSON.stringify(selected)) {
+        setSelected(parsed);
+      }
+    } catch {}
+  }, [answer]);
+
+  useEffect(() => {
     onChange(JSON.stringify(selected));
   }, [selected]);
 

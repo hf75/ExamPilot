@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { api } from "../../api/client";
 import Markdown from "../Markdown";
 
-export default function Feynman({ task, questionData, answer, onChange, disabled, sessionId }) {
+export default function Feynman({ task, questionData, answer, onChange, disabled, sessionId, preview }) {
   const [messages, setMessages] = useState(() => {
     try { return answer ? JSON.parse(answer) : []; }
     catch { return []; }
@@ -36,11 +36,11 @@ export default function Feynman({ task, questionData, answer, onChange, disabled
     setLoading(true);
 
     try {
-      const data = await api.post("/api/student/feynman-chat", {
-        session_id: sessionId,
-        task_id: task.id,
-        messages: updatedMessages,
-      });
+      const endpoint = preview ? "/api/exams/preview/feynman-chat" : "/api/student/feynman-chat";
+      const payload = preview
+        ? { task_id: task.id, messages: updatedMessages }
+        : { session_id: sessionId, task_id: task.id, messages: updatedMessages };
+      const data = await api.post(endpoint, payload);
 
       const aiMsg = { role: "ai", content: data.response };
       const finalMessages = [...updatedMessages, aiMsg];
