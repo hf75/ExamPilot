@@ -158,7 +158,7 @@ export default function DuelTeacherSetup() {
             <div className="duel-mode-selector">
               <button type="button" className={`duel-mode-btn ${mode === "duel" ? "active" : ""}`} onClick={() => setMode("duel")}>
                 <strong>Klassisches Duell</strong>
-                <small>1 gegen 1, wer mehr Punkte hat gewinnt</small>
+                <small>Wer mehr Punkte hat gewinnt</small>
               </button>
               <button type="button" className={`duel-mode-btn ${mode === "royale" ? "active" : ""}`} onClick={() => setMode("royale")}>
                 <strong>Battle Royale</strong>
