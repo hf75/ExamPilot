@@ -5,6 +5,7 @@ import DuelLobby from "./DuelLobby";
 import DuelCountdown from "./DuelCountdown";
 import DuelScoreboard from "./DuelScoreboard";
 import DuelVictory from "./DuelVictory";
+import Markdown from "../Markdown";
 import "./duel.css";
 
 const OPTION_COLORS = ["duel-opt-red", "duel-opt-blue", "duel-opt-yellow", "duel-opt-green"];
@@ -130,8 +131,8 @@ function LiveQuestion({ question, round, totalRounds, answeredCount, totalPlayer
       </div>
 
       <div className="duel-live-question-text">
-        {question.title && <h2>{question.title}</h2>}
-        <p>{question.text}</p>
+        {question.title && question.text && <h2>{question.title}</h2>}
+        <Markdown>{question.text || question.title}</Markdown>
       </div>
 
       {question.options && (

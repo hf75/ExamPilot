@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 :root {
   --bg-primary: #f5f3ff;
   --bg-secondary: #ede9fe;

@@ -9,8 +9,8 @@ from database import get_db
 from models import DuelCreateRequest
 from routers.auth import require_teacher
 from services.duel_engine import (
-    create_room, create_room_from_tasks, get_room, remove_room,
-    cleanup_stale_rooms, DUEL_TASK_TYPES,
+    create_room, create_room_from_tasks, create_room_from_task_ids,
+    get_room, remove_room, cleanup_stale_rooms, DUEL_TASK_TYPES,
 )
 
 router = APIRouter(prefix="/api/duels", tags=["duels"])
@@ -26,14 +26,17 @@ async def create_duel_room(
 
     if req.mode not in ("duel", "royale"):
         raise HTTPException(status_code=400, detail="Modus muss 'duel' oder 'royale' sein")
-    if not req.pool_ids:
-        raise HTTPException(status_code=400, detail="Mindestens ein Aufgabenpool nötig")
+    if not req.pool_ids and not req.task_ids:
+        raise HTTPException(status_code=400, detail="Mindestens einen Pool oder Aufgaben auswählen")
 
-    room = await create_room(req.mode, req.pool_ids, req.total_rounds, req.timer_seconds, db)
+    if req.task_ids:
+        room = await create_room_from_task_ids(req.mode, req.task_ids, req.timer_seconds, db)
+    else:
+        room = await create_room(req.mode, req.pool_ids, req.total_rounds, req.timer_seconds, db)
     if room is None:
         raise HTTPException(
             status_code=400,
-            detail="Keine auto-bewertbaren Aufgaben in den gewählten Pools gefunden",
+            detail="Keine auto-bewertbaren Aufgaben gefunden",
         )
 
     return {
@@ -130,6 +133,131 @@ async def get_pools_for_duel(
     )
     pools = [dict(row) for row in await cursor.fetchall()]
     return pools
+
+
+@router.get("/room/{room_code}/preview")
+async def preview_duel_questions(
+    room_code: str,
+    _: bool = Depends(require_teacher),
+):
+    """Return all questions with correct answers for teacher preview."""
+    room = get_room(room_code)
+    if not room:
+        raise HTTPException(status_code=404, detail="Raum nicht gefunden")
+
+    questions = []
+    for task in room.tasks:
+        qd = task.get("question_data", {})
+        task_type = task.get("task_type", "")
+
+        q = {
+            "title": task.get("title", ""),
+            "text": task.get("text", ""),
+            "task_type": task_type,
+            "options": None,
+            "correct_indices": [],
+            "correct_answer": None,
+        }
+
+        if task_type == "multichoice":
+            answers = qd.get("answers", [])
+            q["options"] = [{"text": a.get("text", ""), "index": i} for i, a in enumerate(answers)]
+            q["correct_indices"] = [i for i, a in enumerate(answers) if a.get("fraction", 0) >= 100]
+        elif task_type == "truefalse":
+            q["options"] = [{"text": "Wahr", "index": "true"}, {"text": "Falsch", "index": "false"}]
+            q["correct_answer"] = str(qd.get("correct_answer", True)).lower()
+        elif task_type == "numerical":
+            best = None
+            for ans in qd.get("answers", []):
+                if ans.get("fraction", 0) >= 100:
+                    best = ans
+                    break
+            if best:
+                q["correct_answer"] = str(best.get("value", ""))
+                if best.get("tolerance", 0):
+                    q["correct_answer"] += f" (±{best['tolerance']})"
+
+        questions.append(q)
+
+    return {"room_code": room.room_code, "total_rounds": room.total_rounds, "questions": questions}
+
+
+@router.delete("/room/{room_code}/question/{question_index}")
+async def delete_duel_question(
+    room_code: str,
+    question_index: int,
+    _: bool = Depends(require_teacher),
+):
+    """Remove a question from a prepared duel room."""
+    room = get_room(room_code)
+    if not room:
+        raise HTTPException(status_code=404, detail="Raum nicht gefunden")
+    if room.phase != "lobby":
+        raise HTTPException(status_code=400, detail="Spiel läuft bereits")
+    if question_index < 0 or question_index >= len(room.tasks):
+        raise HTTPException(status_code=400, detail="Ungültiger Fragenindex")
+    if len(room.tasks) <= 1:
+        raise HTTPException(status_code=400, detail="Mindestens eine Frage muss bleiben")
+
+    removed = room.tasks.pop(question_index)
+    room.total_rounds = len(room.tasks)
+    return {"message": "Frage entfernt", "remaining": len(room.tasks)}
+
+
+@router.get("/pool-questions/{pool_id}")
+async def get_pool_duel_questions(
+    pool_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Return all duel-compatible questions from a pool with correct answers."""
+    import json as _json
+    type_placeholders = ",".join("?" * len(DUEL_TASK_TYPES))
+    cursor = await db.execute(
+        f"""SELECT id, title, text, task_type, question_data
+            FROM tasks
+            WHERE pool_id = ? AND task_type IN ({type_placeholders})
+            ORDER BY id""",
+        (pool_id, *DUEL_TASK_TYPES),
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+
+    questions = []
+    for task in rows:
+        qd = task.get("question_data", "{}")
+        if isinstance(qd, str):
+            try:
+                qd = _json.loads(qd)
+            except Exception:
+                qd = {}
+
+        q = {
+            "task_id": task["id"],
+            "title": task.get("title", ""),
+            "text": task.get("text", ""),
+            "task_type": task["task_type"],
+            "options": None,
+            "correct_indices": [],
+            "correct_answer": None,
+        }
+
+        if task["task_type"] == "multichoice":
+            answers = qd.get("answers", [])
+            q["options"] = [{"text": a.get("text", ""), "index": i} for i, a in enumerate(answers)]
+            q["correct_indices"] = [i for i, a in enumerate(answers) if a.get("fraction", 0) >= 100]
+        elif task["task_type"] == "truefalse":
+            q["options"] = [{"text": "Wahr", "index": "true"}, {"text": "Falsch", "index": "false"}]
+            q["correct_answer"] = str(qd.get("correct_answer", True)).lower()
+        elif task["task_type"] == "numerical":
+            best = next((a for a in qd.get("answers", []) if a.get("fraction", 0) >= 100), None)
+            if best:
+                q["correct_answer"] = str(best.get("value", ""))
+                if best.get("tolerance", 0):
+                    q["correct_answer"] += f" (±{best['tolerance']})"
+
+        questions.append(q)
+
+    return questions
 
 
 @router.get("/server-info")

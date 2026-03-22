@@ -60,32 +60,43 @@ def generate_room_code() -> str:
 async def create_room(mode: str, pool_ids: list[int], total_rounds: int,
                       timer_seconds: int, db) -> GameRoom:
     code = generate_room_code()
+    load_all = total_rounds == 0
     room = GameRoom(
         room_code=code,
         mode=mode,
         pool_ids=pool_ids,
-        total_rounds=max(3, min(20, total_rounds)),
+        total_rounds=total_rounds,
         timer_seconds=max(10, min(60, timer_seconds)),
     )
 
     # Load tasks from pools
     placeholders = ",".join("?" * len(pool_ids))
     type_placeholders = ",".join("?" * len(DUEL_TASK_TYPES))
-    cursor = await db.execute(
-        f"""SELECT id, title, text, task_type, question_data, points
-            FROM tasks
-            WHERE pool_id IN ({placeholders})
-            AND task_type IN ({type_placeholders})
-            ORDER BY RANDOM()
-            LIMIT ?""",
-        (*pool_ids, *DUEL_TASK_TYPES, room.total_rounds),
-    )
+    if load_all:
+        cursor = await db.execute(
+            f"""SELECT id, title, text, task_type, question_data, points
+                FROM tasks
+                WHERE pool_id IN ({placeholders})
+                AND task_type IN ({type_placeholders})
+                ORDER BY RANDOM()""",
+            (*pool_ids, *DUEL_TASK_TYPES),
+        )
+    else:
+        clamped = max(3, min(20, total_rounds))
+        cursor = await db.execute(
+            f"""SELECT id, title, text, task_type, question_data, points
+                FROM tasks
+                WHERE pool_id IN ({placeholders})
+                AND task_type IN ({type_placeholders})
+                ORDER BY RANDOM()
+                LIMIT ?""",
+            (*pool_ids, *DUEL_TASK_TYPES, clamped),
+        )
     rows = [dict(r) for r in await cursor.fetchall()]
 
-    if len(rows) < room.total_rounds:
-        room.total_rounds = len(rows)
     if len(rows) == 0:
         return None
+    room.total_rounds = len(rows)
 
     for row in rows:
         qd = row.get("question_data")
@@ -97,6 +108,50 @@ async def create_room(mode: str, pool_ids: list[int], total_rounds: int,
         row["question_data"] = qd or {}
     room.tasks = rows
 
+    _rooms[code] = room
+    return room
+
+
+async def create_room_from_task_ids(mode: str, task_ids: list[int],
+                                    timer_seconds: int, db) -> GameRoom | None:
+    """Create a room from specific task IDs selected by the teacher."""
+    if not task_ids:
+        return None
+
+    placeholders = ",".join("?" * len(task_ids))
+    type_placeholders = ",".join("?" * len(DUEL_TASK_TYPES))
+    cursor = await db.execute(
+        f"""SELECT id, title, text, task_type, question_data, points
+            FROM tasks
+            WHERE id IN ({placeholders})
+            AND task_type IN ({type_placeholders})""",
+        (*task_ids, *DUEL_TASK_TYPES),
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    if not rows:
+        return None
+
+    # Preserve the order from task_ids
+    id_order = {tid: i for i, tid in enumerate(task_ids)}
+    rows.sort(key=lambda r: id_order.get(r["id"], 999))
+
+    for row in rows:
+        qd = row.get("question_data")
+        if isinstance(qd, str):
+            try:
+                qd = json.loads(qd)
+            except Exception:
+                qd = {}
+        row["question_data"] = qd or {}
+
+    code = generate_room_code()
+    room = GameRoom(
+        room_code=code,
+        mode=mode,
+        total_rounds=len(rows),
+        timer_seconds=max(10, min(60, timer_seconds)),
+    )
+    room.tasks = rows
     _rooms[code] = room
     return room
 

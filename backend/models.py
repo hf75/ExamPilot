@@ -199,6 +199,7 @@ class ScenarioNextRequest(BaseModel):
 
 class DuelCreateRequest(BaseModel):
     mode: str = "duel"
-    pool_ids: list[int]
+    pool_ids: list[int] = []
+    task_ids: list[int] = []
     total_rounds: int = 5
     timer_seconds: int = 20

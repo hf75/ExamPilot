@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Markdown from "../Markdown";
 
 const OPTION_COLORS = ["duel-opt-red", "duel-opt-blue", "duel-opt-yellow", "duel-opt-green"];
 const OPTION_LABELS = ["A", "B", "C", "D"];
@@ -42,8 +43,8 @@ export default function DuelQuestion({ question, timerSeconds, onAnswer, answere
       <div className="duel-timer-text">{Math.ceil(timeLeft)}s</div>
 
       <div className="duel-question-text">
-        {question.title && <h3 className="duel-question-title">{question.title}</h3>}
-        <p>{question.text}</p>
+        {question.title && question.text && <h3 className="duel-question-title">{question.title}</h3>}
+        <Markdown>{question.text || question.title}</Markdown>
       </div>
 
       {question.task_type === "numerical" ? (
