@@ -75,8 +75,30 @@ if frontend_dist.exists():
 
 
 if __name__ == "__main__":
+    import socket
+
+    def _get_lan_ip():
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "localhost"
+
+    port = 8000
+    lan_ip = _get_lan_ip()
+    print()
+    print("=" * 48)
+    print("  ExamPilot gestartet!")
+    print()
+    print(f"  Lehrer:   http://{lan_ip}:{port}/login")
+    print(f"  Schueler: http://{lan_ip}:{port}")
+    print("=" * 48)
+    print()
+
     if getattr(sys, "frozen", False):
-        # PyInstaller: run directly, no reload
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
     else:
-        uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+        uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

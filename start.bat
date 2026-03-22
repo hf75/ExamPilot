@@ -60,12 +60,6 @@ if not exist "frontend\dist" (
 )
 
 echo.
-echo ============================================
-echo   Server startet auf http://localhost:8000
-echo   Schueler verbinden sich mit:
-echo   http://DEINE-IP:8000
-echo ============================================
-echo.
 
 cd backend
 python main.py
