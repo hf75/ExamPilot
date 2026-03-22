@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 import Markdown from "../Markdown";
 
 const TASK_TYPES = {
@@ -44,7 +45,7 @@ export default function Results() {
       setExam(data.exam);
       setSessions(data.sessions);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
       navigate("/teacher/exams");
     } finally {
       setLoading(false);
@@ -59,7 +60,7 @@ export default function Results() {
       const data = await api.get(`/api/exams/${examId}/statistics`);
       setStats(data);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setStatsLoading(false);
     }
@@ -73,7 +74,7 @@ export default function Results() {
       const data = await api.post(`/api/exams/${examId}/class-analysis`);
       setAnalysis(data.analysis);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setAnalysisLoading(false);
     }
@@ -86,7 +87,7 @@ export default function Results() {
       const data = await api.post(`/api/exams/${examId}/class-analysis`);
       setAnalysis(data.analysis);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setAnalysisLoading(false);
     }

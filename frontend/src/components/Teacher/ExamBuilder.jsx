@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 import QuestionRenderer from "../Questions/QuestionRenderer";
 import Markdown from "../Markdown";
 
@@ -70,8 +71,12 @@ export default function ExamBuilder() {
   }, []);
 
   async function loadExams() {
-    const data = await api.get("/api/exams");
-    setExams(data);
+    try {
+      const data = await api.get("/api/exams");
+      setExams(data);
+    } catch (err) {
+      toast.error("Klassenarbeiten konnten nicht geladen werden");
+    }
   }
 
   async function handleDuplicate(id) {
@@ -79,7 +84,7 @@ export default function ExamBuilder() {
       await api.post(`/api/exams/${id}/duplicate`);
       loadExams();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -327,7 +332,7 @@ function ExamForm({ exam, onSave, onCancel }) {
       }
       onSave();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -530,11 +535,11 @@ function AdhocExamForm({ onDone, onCancel }) {
   async function handleGenerate(e) {
     e.preventDefault();
     if (files.length === 0) {
-      alert("Bitte mindestens ein Dokument hochladen.");
+      toast.error("Bitte mindestens ein Dokument hochladen.");
       return;
     }
     if (!form.title.trim()) {
-      alert("Bitte einen Titel eingeben.");
+      toast.error("Bitte einen Titel eingeben.");
       return;
     }
 
@@ -572,7 +577,7 @@ function AdhocExamForm({ onDone, onCancel }) {
       setTimeout(() => onDone(result.exam), 1500);
     } catch (err) {
       setProgress("");
-      alert("Fehler: " + (err.message || "Unbekannter Fehler"));
+      toast.error(err.message || "Unbekannter Fehler");
       setGenerating(false);
     }
   }

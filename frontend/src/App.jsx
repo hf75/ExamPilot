@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { isLoggedIn } from "./api/client";
+import ToastContainer from "./components/shared/Toast";
 import Login from "./components/shared/Login";
 import Dashboard from "./components/Teacher/Dashboard";
 import Overview from "./components/Teacher/Overview";
@@ -27,6 +28,7 @@ function ProtectedRoute({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <ToastContainer />
       <Routes>
         {/* Student routes */}
         <Route path="/" element={<JoinExam />} />

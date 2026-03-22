@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 import Markdown from "../Markdown";
 
 export default function Scenario({ task, questionData, answer, onChange, disabled, sessionId, preview }) {
@@ -65,7 +66,7 @@ export default function Scenario({ task, questionData, answer, onChange, disable
         setOutcomeSummary(result.outcome_summary || "");
       }
     } catch (err) {
-      alert("Fehler: " + err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -102,7 +103,7 @@ export default function Scenario({ task, questionData, answer, onChange, disable
     } catch (err) {
       // Save what we have so far
       onChange(JSON.stringify(updatedTranscript));
-      alert("Fehler: " + err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }

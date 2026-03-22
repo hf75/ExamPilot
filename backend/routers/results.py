@@ -202,13 +202,18 @@ async def adjust_answer(
     db: aiosqlite.Connection = Depends(get_db),
     _: bool = Depends(require_teacher),
 ):
-    cursor = await db.execute("SELECT * FROM answers WHERE id = ?", (answer_id,))
+    cursor = await db.execute(
+        "SELECT a.*, t.points as max_points FROM answers a JOIN tasks t ON t.id = a.task_id WHERE a.id = ?",
+        (answer_id,),
+    )
     answer = await cursor.fetchone()
     if not answer:
         raise HTTPException(status_code=404, detail="Antwort nicht gefunden")
 
     update_fields = "points_awarded = ?, manually_adjusted = TRUE, disputed = FALSE, dispute_reason = NULL"
-    is_correct = req.points_awarded > 0
+    answer_dict = dict(answer)
+    max_points = answer_dict.get("max_points", 0)
+    is_correct = req.points_awarded >= max_points if max_points > 0 else req.points_awarded > 0
     update_fields += ", is_correct = ?"
     values = [req.points_awarded, is_correct]
     if req.feedback is not None:
@@ -219,7 +224,6 @@ async def adjust_answer(
     await db.execute(f"UPDATE answers SET {update_fields} WHERE id = ?", values)
 
     # Recalculate session total
-    answer_dict = dict(answer)
     session_id = answer_dict["session_id"]
     cursor = await db.execute(
         "SELECT COALESCE(SUM(points_awarded), 0) FROM answers WHERE session_id = ?",

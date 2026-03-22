@@ -8,12 +8,16 @@ export default function LiveMonitor() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const ws = useRef(null);
+  const reconnectDelay = useRef(1000);
+  const unmounted = useRef(false);
 
   useEffect(() => {
+    unmounted.current = false;
     loadProgress();
     connectWebSocket();
     const interval = setInterval(loadProgress, 5000);
     return () => {
+      unmounted.current = true;
       clearInterval(interval);
       if (ws.current) ws.current.close();
     };
@@ -31,16 +35,24 @@ export default function LiveMonitor() {
   }
 
   function connectWebSocket() {
+    if (unmounted.current) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
     const url = `${protocol}//${host}/ws/exam/${examId}`;
 
     ws.current = new WebSocket(url);
+    ws.current.onopen = () => {
+      reconnectDelay.current = 1000;
+    };
     ws.current.onmessage = () => {
       loadProgress();
     };
+    ws.current.onerror = () => {};
     ws.current.onclose = () => {
-      setTimeout(connectWebSocket, 3000);
+      if (unmounted.current) return;
+      const delay = Math.min(reconnectDelay.current, 30000);
+      reconnectDelay.current = delay * 2;
+      setTimeout(connectWebSocket, delay);
     };
   }
 

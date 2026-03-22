@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 
 const TASK_TYPES = {
   multichoice: "Multiple Choice",
@@ -646,7 +647,7 @@ function WebAppConfig({ qd, onChange }) {
   const [desc, setDesc] = useState(qd.app_description || "");
 
   async function handleGenerate() {
-    if (!desc.trim()) return alert("Bitte eine Beschreibung eingeben.");
+    if (!desc.trim()) return toast.error("Bitte eine Beschreibung eingeben.");
     setGenerating(true);
     try {
       const result = await api.post("/api/tasks/generate-webapp", {
@@ -655,7 +656,7 @@ function WebAppConfig({ qd, onChange }) {
       });
       onChange({ app_html: result.app_html, app_description: desc });
     } catch (err) {
-      alert("Fehler: " + err.message);
+      toast.error(err.message);
     } finally {
       setGenerating(false);
     }

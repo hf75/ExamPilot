@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, Any
 from datetime import datetime
 
@@ -34,6 +34,20 @@ class TaskCreate(BaseModel):
     question_data: Optional[dict[str, Any]] = None
     pool_id: Optional[int] = None
 
+    @field_validator("points")
+    @classmethod
+    def validate_points(cls, v):
+        if v < 0:
+            raise ValueError("Punkte dürfen nicht negativ sein")
+        return v
+
+    @field_validator("task_type")
+    @classmethod
+    def validate_task_type(cls, v):
+        if v not in VALID_TASK_TYPES:
+            raise ValueError(f"Ungültiger Aufgabentyp: {v}")
+        return v
+
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     text: Optional[str] = None
@@ -44,6 +58,20 @@ class TaskUpdate(BaseModel):
     points: Optional[int] = None
     question_data: Optional[dict[str, Any]] = None
     pool_id: Optional[int] = None
+
+    @field_validator("points")
+    @classmethod
+    def validate_points(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("Punkte dürfen nicht negativ sein")
+        return v
+
+    @field_validator("task_type")
+    @classmethod
+    def validate_task_type(cls, v):
+        if v is not None and v not in VALID_TASK_TYPES:
+            raise ValueError(f"Ungültiger Aufgabentyp: {v}")
+        return v
 
 class TaskOut(BaseModel):
     id: int
@@ -85,6 +113,16 @@ class ExamCreate(BaseModel):
     password: Optional[str] = None
     shuffle_tasks: Optional[bool] = False
     grading_scale: Optional[list[dict]] = None
+
+    @field_validator("grading_scale")
+    @classmethod
+    def validate_grading_scale(cls, v):
+        if v is None:
+            return v
+        for entry in v:
+            if "percent" not in entry or "grade" not in entry or "label" not in entry:
+                raise ValueError("Jeder Notenschlüssel-Eintrag braucht percent, grade und label")
+        return v
 
 class ExamUpdate(BaseModel):
     title: Optional[str] = None

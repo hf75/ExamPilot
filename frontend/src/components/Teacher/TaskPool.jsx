@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 import TaskEditor from "./TaskEditor";
 import Markdown from "../Markdown";
 
@@ -149,7 +150,7 @@ export default function TaskPool() {
         setSelectedPoolId(data[0].id);
       }
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -166,7 +167,7 @@ export default function TaskPool() {
       loadTasks();
       loadPools();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -178,7 +179,7 @@ export default function TaskPool() {
       loadTasks();
       loadPools();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -191,7 +192,7 @@ export default function TaskPool() {
       setAiPrompt("");
       loadTasks();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setAiLoading(false);
     }
@@ -352,7 +353,7 @@ export default function TaskPool() {
                   a.click();
                   URL.revokeObjectURL(blobUrl);
                 } catch (err) {
-                  alert(err.message);
+                  toast.error(err.message);
                 }
               }}
             >
@@ -589,7 +590,7 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
         allTasks.push(...data.tasks.map((t) => ({ ...t, _source: files[i].name })));
       }
       if (errors.length > 0) {
-        alert("Fehler bei:\n" + errors.join("\n"));
+        toast.error("Fehler bei:\n" + errors.join("\n"));
       }
       if (allTasks.length > 0) {
         setPreview(allTasks);
@@ -597,7 +598,7 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
         setLoading(false);
       }
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
       setLoadingStatus("");
@@ -624,7 +625,7 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
       onImported();
       onClose();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -752,7 +753,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
       });
       setPreview(data.tasks);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -778,7 +779,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
       onGenerated();
       onClose();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -921,7 +922,7 @@ function MoodleImportModal({ poolId, onClose, onImported }) {
       const data = await res.json();
       setPreview(data.tasks);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -947,7 +948,7 @@ function MoodleImportModal({ poolId, onClose, onImported }) {
       onImported();
       onClose();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }

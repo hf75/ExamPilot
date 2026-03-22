@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 import Markdown from "../Markdown";
 
 export default function ResultView() {
@@ -23,7 +24,7 @@ export default function ResultView() {
       .get(`/api/student/results/${sessionId}`)
       .then(setResult)
       .catch((err) => {
-        alert(err.message);
+        toast.error(err.message);
         navigate("/");
       })
       .finally(() => setLoading(false));
@@ -44,7 +45,7 @@ export default function ResultView() {
       setDisputeReason("");
       loadResults();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -58,7 +59,7 @@ export default function ResultView() {
       const data = await api.post(`/api/student/learning-material/${sessionId}`);
       setLearningMaterial(data);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLearningLoading(false);
     }
@@ -107,7 +108,7 @@ ${learningMaterial.material.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(
       const data = await api.post("/api/student/explain", { answer_id: answerId });
       setExplanations((prev) => ({ ...prev, [answerId]: data.explanation }));
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setLoadingExplain((prev) => ({ ...prev, [answerId]: false }));
     }

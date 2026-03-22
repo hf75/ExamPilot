@@ -98,33 +98,29 @@ async def init_db():
             );
         """)
 
-        # Migration: add disputed columns if they don't exist
-        try:
+        # Helper to check if a column exists
+        async def has_column(table, column):
+            cursor = await db.execute(f"PRAGMA table_info({table})")
+            columns = {row[1] for row in await cursor.fetchall()}
+            return column in columns
+
+        # Migration: add disputed columns
+        if not await has_column("answers", "disputed"):
             await db.execute("ALTER TABLE answers ADD COLUMN disputed BOOLEAN DEFAULT FALSE")
-        except Exception:
-            pass
-        try:
+        if not await has_column("answers", "dispute_reason"):
             await db.execute("ALTER TABLE answers ADD COLUMN dispute_reason TEXT")
-        except Exception:
-            pass
 
         # Migration: solution (Musterlösung) field for tasks
-        try:
+        if not await has_column("tasks", "solution"):
             await db.execute("ALTER TABLE tasks ADD COLUMN solution TEXT DEFAULT ''")
-        except Exception:
-            pass
 
         # Migration: grading_status for async AI grading
-        try:
+        if not await has_column("answers", "grading_status"):
             await db.execute("ALTER TABLE answers ADD COLUMN grading_status TEXT")
-        except Exception:
-            pass
 
         # Migration: add question_data column and remap old task_type values
-        try:
+        if not await has_column("tasks", "question_data"):
             await db.execute("ALTER TABLE tasks ADD COLUMN question_data TEXT DEFAULT '{}'")
-        except Exception:
-            pass
         await db.execute(
             "UPDATE tasks SET task_type = 'essay' WHERE task_type IN ('command', 'explanation', 'mixed')"
         )
@@ -137,16 +133,12 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        try:
+        if not await has_column("tasks", "pool_id"):
             await db.execute("ALTER TABLE tasks ADD COLUMN pool_id INTEGER REFERENCES task_pools(id) ON DELETE CASCADE")
-        except Exception:
-            pass
 
         # Migration: optional password for exams
-        try:
+        if not await has_column("exams", "password"):
             await db.execute("ALTER TABLE exams ADD COLUMN password TEXT")
-        except Exception:
-            pass
 
         # Ensure a default pool exists and assign orphaned tasks
         cursor = await db.execute("SELECT id FROM task_pools LIMIT 1")
@@ -159,16 +151,12 @@ async def init_db():
         await db.execute("UPDATE tasks SET pool_id = ? WHERE pool_id IS NULL", (default_pool_id,))
 
         # Migration: shuffle_tasks option for exams
-        try:
+        if not await has_column("exams", "shuffle_tasks"):
             await db.execute("ALTER TABLE exams ADD COLUMN shuffle_tasks BOOLEAN DEFAULT FALSE")
-        except Exception:
-            pass
 
         # Migration: custom grading scale per exam (JSON)
-        try:
+        if not await has_column("exams", "grading_scale"):
             await db.execute("ALTER TABLE exams ADD COLUMN grading_scale TEXT")
-        except Exception:
-            pass
 
         # Migration: class analysis cache
         await db.execute("""
@@ -180,5 +168,14 @@ async def init_db():
                 FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE
             )
         """)
+
+        # Indexes on foreign keys for query performance
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_exam_sessions_exam_id ON exam_sessions(exam_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_exam_sessions_student_id ON exam_sessions(student_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_answers_session_id ON answers(session_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_answers_task_id ON answers(task_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_exam_tasks_exam_id ON exam_tasks(exam_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_exam_tasks_task_id ON exam_tasks(task_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_tasks_pool_id ON tasks(pool_id)")
 
         await db.commit()

@@ -107,6 +107,9 @@ async def get_session(
     # If exam was closed by teacher, mark session as submitted
     if session_dict["exam_status"] != "active" and session_dict["status"] == "in_progress":
         session_dict["status"] = "closed"
+    # Treat 'submitting' as 'submitted' for the frontend
+    if session_dict["status"] == "submitting":
+        session_dict["status"] = "submitted"
 
     # Check if exam has shuffle enabled
     exam_cursor = await db.execute(
@@ -219,13 +222,16 @@ async def submit_answer(
 ):
     # Verify session exists and is in progress
     cursor = await db.execute(
-        "SELECT status, exam_id FROM exam_sessions WHERE id = ?", (req.session_id,)
+        "SELECT es.status, es.exam_id, e.status as exam_status FROM exam_sessions es JOIN exams e ON e.id = es.exam_id WHERE es.id = ?",
+        (req.session_id,),
     )
     session = await cursor.fetchone()
     if not session:
         raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
     if session[0] != "in_progress":
         raise HTTPException(status_code=400, detail="Klassenarbeit bereits abgegeben")
+    if session[2] != "active":
+        raise HTTPException(status_code=400, detail="Klassenarbeit wurde geschlossen")
     exam_id_for_broadcast = session[1]
 
     # Get task details for grading
@@ -522,20 +528,43 @@ async def scenario_next(req: ScenarioNextRequest, db: aiosqlite.Connection = Dep
 async def submit_exam(
     session_id: int, db: aiosqlite.Connection = Depends(get_db)
 ):
+    # Atomically claim the session for submission to prevent double-submit
     cursor = await db.execute(
-        "SELECT status FROM exam_sessions WHERE id = ?", (session_id,)
+        "UPDATE exam_sessions SET status = 'submitting' WHERE id = ? AND status = 'in_progress'",
+        (session_id,),
     )
-    session = await cursor.fetchone()
-    if not session:
-        raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
-    if session[0] != "in_progress":
+    await db.commit()
+    if cursor.rowcount == 0:
+        # Either session doesn't exist or was already submitted
+        cursor = await db.execute("SELECT status FROM exam_sessions WHERE id = ?", (session_id,))
+        session = await cursor.fetchone()
+        if not session:
+            raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
         raise HTTPException(status_code=400, detail="Bereits abgegeben")
+
+    # Verify exam has tasks
+    cursor = await db.execute(
+        "SELECT exam_id FROM exam_sessions WHERE id = ?", (session_id,)
+    )
+    session_row = await cursor.fetchone()
+    if session_row:
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM exam_tasks WHERE exam_id = ?", (session_row[0],)
+        )
+        task_count = (await cursor.fetchone())[0]
+        if task_count == 0:
+            # Revert status since there's nothing to submit
+            await db.execute(
+                "UPDATE exam_sessions SET status = 'in_progress' WHERE id = ?", (session_id,)
+            )
+            await db.commit()
+            raise HTTPException(status_code=400, detail="Klassenarbeit hat keine Aufgaben")
 
     # Trigger AI grading for all ungraded AI-gradable tasks
     cursor = await db.execute(
         """SELECT a.id, t.*, a.student_answer FROM answers a
            JOIN tasks t ON t.id = a.task_id
-           WHERE a.session_id = ? AND t.task_type IN ('essay', 'shortanswer', 'drawing', 'webapp', 'feynman', 'scenario')
+           WHERE a.session_id = ? AND t.task_type IN ('essay', 'shortanswer', 'drawing', 'webapp', 'feynman', 'scenario', 'photo')
            AND a.student_answer IS NOT NULL AND a.student_answer != ''
            AND (a.grading_status IS NULL OR a.grading_status = 'saved')""",
         (session_id,),

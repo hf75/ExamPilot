@@ -50,7 +50,6 @@ def _parse_answer(student_answer: str):
 
 def _grade_multichoice(qdata: dict, student_answer: str, max_points: int) -> dict:
     answers = qdata.get("answers", [])
-    single = qdata.get("single", True)
     selected = _parse_answer(student_answer)
 
     if not isinstance(selected, list):

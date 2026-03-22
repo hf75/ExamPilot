@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 import QuestionRenderer from "../Questions/QuestionRenderer";
 import TaskNav from "./TaskNav";
 import Markdown from "../Markdown";
@@ -17,6 +18,7 @@ export default function ExamView() {
   const [timeLeft, setTimeLeft] = useState(null);
   const [saveErrors, setSaveErrors] = useState([]);
   const [flagged, setFlagged] = useState(new Set());
+  const [saveStatus, setSaveStatus] = useState(""); // "", "saving", "saved", "error"
   const autoSaveTimer = useRef(null);
   const isSubmittingRef = useRef(false);
 
@@ -76,7 +78,7 @@ export default function ExamView() {
       }
       setAnswers(answerMap);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
       navigate("/");
     } finally {
       setLoading(false);
@@ -86,14 +88,18 @@ export default function ExamView() {
   // Auto-save answer (debounced) — saves only, no grading during exam
   const autoSave = useCallback(
     async (taskId, answer) => {
+      setSaveStatus("saving");
       try {
         await api.post("/api/student/answer", {
           session_id: parseInt(sessionId),
           task_id: taskId,
           student_answer: answer,
         });
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus((s) => s === "saved" ? "" : s), 2000);
       } catch {
-        // ignore save errors
+        setSaveStatus("error");
+        toast.error("Antwort konnte nicht gespeichert werden");
       }
     },
     [sessionId]
@@ -156,6 +162,9 @@ export default function ExamView() {
         } catch {}
       });
 
+      // Small delay to let Drawing component debounce timers flush
+      await new Promise((r) => setTimeout(r, 600));
+
       // Save all pending answers, track failures
       const failures = [];
       const savePromises = Object.entries(answers)
@@ -177,7 +186,7 @@ export default function ExamView() {
       await api.post(`/api/student/submit/${sessionId}`);
       navigate(`/results/${sessionId}`);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
       isSubmittingRef.current = false;
     } finally {
       setSubmitting(false);
@@ -233,6 +242,11 @@ export default function ExamView() {
           <span className="exam-progress">
             {answeredCount}/{tasks.length} beantwortet
           </span>
+          {saveStatus && (
+            <span className={`autosave-indicator ${saveStatus}`}>
+              {saveStatus === "saving" ? "Speichert..." : saveStatus === "saved" ? "Gespeichert" : "Fehler!"}
+            </span>
+          )}
           <button
             className="btn-submit-exam"
             onClick={() => setShowConfirm(true)}

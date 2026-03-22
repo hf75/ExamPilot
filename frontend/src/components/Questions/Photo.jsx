@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { toast } from "../shared/Toast";
 
 export default function Photo({ task, questionData, answer, onChange, disabled }) {
   const [preview, setPreview] = useState(answer && answer.startsWith("data:image") ? answer : null);
@@ -51,7 +52,7 @@ export default function Photo({ task, questionData, answer, onChange, disabled }
         videoRef.current.srcObject = stream;
       }
     } catch {
-      alert("Kamera konnte nicht gestartet werden. Bitte erlaube den Kamerazugriff oder verwende die Dateiauswahl.");
+      toast.error("Kamera konnte nicht gestartet werden. Bitte erlaube den Kamerazugriff oder verwende die Dateiauswahl.");
       setCapturing(false);
     }
   }

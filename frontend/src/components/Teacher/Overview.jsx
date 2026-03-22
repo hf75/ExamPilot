@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 
 export default function Overview() {
   const navigate = useNavigate();
@@ -25,9 +26,9 @@ export default function Overview() {
     try {
       await api.post("/api/auth/reset-all", {});
       setStats({ tasks: 0, exams: 0, activeExams: [] });
-      alert("System wurde zurückgesetzt.");
+      toast.error("System wurde zurückgesetzt.");
     } catch (err) {
-      alert("Fehler: " + err.message);
+      toast.error(err.message);
     }
   }
 

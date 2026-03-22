@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 import QuestionRenderer from "../Questions/QuestionRenderer";
 import TaskNav from "../Student/TaskNav";
 import Markdown from "../Markdown";
@@ -23,7 +24,7 @@ export default function ExamPreview() {
       const data = await api.get(`/api/exams/${examId}/preview`);
       setSession(data);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
       navigate("/teacher/exams");
     } finally {
       setLoading(false);

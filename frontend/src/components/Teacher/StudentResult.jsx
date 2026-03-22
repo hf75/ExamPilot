@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import { toast } from "../shared/Toast";
 import Markdown from "../Markdown";
 
 export default function StudentResult() {
@@ -23,7 +24,7 @@ export default function StudentResult() {
       );
       setData(result);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
       navigate(`/teacher/exams/${examId}/results`);
     } finally {
       setLoading(false);
@@ -39,7 +40,7 @@ export default function StudentResult() {
       setEditingAnswer(null);
       loadData();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -58,7 +59,7 @@ export default function StudentResult() {
       });
       loadData();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   }
 

@@ -1,5 +1,6 @@
 import csv
 import io
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse, Response
 import aiosqlite
@@ -8,6 +9,11 @@ from database import get_db
 from routers.auth import require_teacher, verify_token
 from services.export_service import generate_student_pdf, generate_overview_pdf
 from services.grading import calculate_grade, parse_scale
+
+
+def _safe_filename(name: str) -> str:
+    """Encode filename for Content-Disposition header (RFC 5987)."""
+    return f"UTF-8''{quote(name)}"
 
 router = APIRouter(prefix="/api/exams", tags=["export"])
 
@@ -55,7 +61,7 @@ async def export_overview_pdf(
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="Ergebnisse_{exam["title"]}.pdf"'},
+        headers={"Content-Disposition": f"attachment; filename*={_safe_filename(f'Ergebnisse_{exam[\"title\"]}.pdf')}"},
     )
 
 
@@ -110,7 +116,7 @@ async def export_student_pdf(
         buffer,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="Ergebnis_{session["student_name"]}.pdf"'
+            "Content-Disposition": f"attachment; filename*={_safe_filename(f'Ergebnis_{session[\"student_name\"]}.pdf')}"
         },
     )
 
@@ -176,5 +182,5 @@ async def export_results_csv(
     return Response(
         content=csv_content,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="Ergebnisse_{exam["title"]}.csv"'},
+        headers={"Content-Disposition": f"attachment; filename*={_safe_filename(f'Ergebnisse_{exam[\"title\"]}.csv')}"},
     )
