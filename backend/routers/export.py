@@ -61,7 +61,7 @@ async def export_overview_pdf(
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename*={_safe_filename(f'Ergebnisse_{exam[\"title\"]}.pdf')}"},
+        headers={"Content-Disposition": f"attachment; filename*={_safe_filename('Ergebnisse_' + exam['title'] + '.pdf')}"},
     )
 
 
@@ -116,7 +116,7 @@ async def export_student_pdf(
         buffer,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename*={_safe_filename(f'Ergebnis_{session[\"student_name\"]}.pdf')}"
+            "Content-Disposition": f"attachment; filename*={_safe_filename('Ergebnis_' + session['student_name'] + '.pdf')}"
         },
     )
 
@@ -182,5 +182,5 @@ async def export_results_csv(
     return Response(
         content=csv_content,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename*={_safe_filename(f'Ergebnisse_{exam[\"title\"]}.csv')}"},
+        headers={"Content-Disposition": f"attachment; filename*={_safe_filename('Ergebnisse_' + exam['title'] + '.csv')}"},
     )

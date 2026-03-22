@@ -2,27 +2,12 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { toast } from "../shared/Toast";
+import useEnabledTaskTypes from "../../hooks/useEnabledTaskTypes";
 import QuestionRenderer from "../Questions/QuestionRenderer";
 import Markdown from "../Markdown";
 
-const GENERATABLE_TYPES = {
-  multichoice: "Multiple Choice",
-  truefalse: "Wahr/Falsch",
-  shortanswer: "Kurzantwort",
-  numerical: "Numerisch",
-  matching: "Zuordnung",
-  ordering: "Reihenfolge",
-  essay: "Freitext",
-  drawing: "Zeichnung",
-  webapp: "Web-App",
-  feynman: "Feynman-Erklärung",
-  scenario: "Branching-Szenario",
-  coding: "Programmierung",
-  photo: "Foto-Aufgabe",
-};
-
-function TaskTypeFilter({ selected, onChange }) {
-  const allKeys = Object.keys(GENERATABLE_TYPES);
+function TaskTypeFilter({ selected, onChange, availableTypes }) {
+  const allKeys = Object.keys(availableTypes);
   const allSelected = selected.length === allKeys.length;
 
   function toggleType(type) {
@@ -44,7 +29,7 @@ function TaskTypeFilter({ selected, onChange }) {
         >
           Alle
         </button>
-        {Object.entries(GENERATABLE_TYPES).map(([key, label]) => (
+        {Object.entries(availableTypes).map(([key, label]) => (
           <button
             type="button"
             key={key}
@@ -509,6 +494,7 @@ function ExamForm({ exam, onSave, onCancel }) {
 }
 
 function AdhocExamForm({ onDone, onCancel }) {
+  const { filteredTypes } = useEnabledTaskTypes();
   const [form, setForm] = useState({
     title: "",
     class_name: "",
@@ -518,8 +504,13 @@ function AdhocExamForm({ onDone, onCancel }) {
     instructions: "",
   });
   const [files, setFiles] = useState([]);
-  const [allowedTypes, setAllowedTypes] = useState(Object.keys(GENERATABLE_TYPES));
+  const [allowedTypes, setAllowedTypes] = useState([]);
   const [codingLanguage, setCodingLanguage] = useState("python");
+
+  // Initialize allowedTypes from enabled settings
+  useEffect(() => {
+    setAllowedTypes(Object.keys(filteredTypes));
+  }, [Object.keys(filteredTypes).join(",")]);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState("");
 
@@ -658,7 +649,7 @@ function AdhocExamForm({ onDone, onCancel }) {
           />
         </div>
 
-        <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} />
+        <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} availableTypes={filteredTypes} />
 
         {allowedTypes.includes("coding") && (
           <div className="form-group">

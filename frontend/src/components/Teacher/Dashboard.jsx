@@ -50,6 +50,9 @@ export default function Dashboard() {
           <Link to="/teacher/duels" className={isActive("/teacher/duels") ? "nav-active" : ""} onClick={handleNavClick}>
             Lern-Duelle
           </Link>
+          <Link to="/teacher/settings" className={isActive("/teacher/settings") ? "nav-active" : ""} onClick={handleNavClick}>
+            Einstellungen
+          </Link>
           <button onClick={handleLogout} className="btn-logout">
             Abmelden
           </button>

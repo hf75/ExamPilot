@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../../api/client";
 import { toast } from "../shared/Toast";
+import useEnabledTaskTypes from "../../hooks/useEnabledTaskTypes";
 
 const TASK_TYPES = {
   multichoice: "Multiple Choice",
@@ -69,6 +70,7 @@ function getDefaultQuestionData(type) {
 }
 
 export default function TaskEditor({ task, poolId, onSave, onCancel }) {
+  const { filteredTypes } = useEnabledTaskTypes();
   const isNew = task === null;
   const [form, setForm] = useState({
     title: task?.title || "",
@@ -147,7 +149,7 @@ export default function TaskEditor({ task, poolId, onSave, onCancel }) {
               value={form.task_type}
               onChange={(e) => handleTypeChange(e.target.value)}
             >
-              {Object.entries(TASK_TYPES).map(([key, label]) => (
+              {Object.entries(isNew ? filteredTypes : TASK_TYPES).map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
               ))}
             </select>

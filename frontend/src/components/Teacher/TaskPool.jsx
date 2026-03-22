@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../../api/client";
 import { toast } from "../shared/Toast";
+import useEnabledTaskTypes from "../../hooks/useEnabledTaskTypes";
 import TaskEditor from "./TaskEditor";
 import Markdown from "../Markdown";
 
@@ -22,24 +23,8 @@ const TASK_TYPES = {
   photo: "Foto-Aufgabe",
 };
 
-const GENERATABLE_TYPES = {
-  multichoice: "Multiple Choice",
-  truefalse: "Wahr/Falsch",
-  shortanswer: "Kurzantwort",
-  numerical: "Numerisch",
-  matching: "Zuordnung",
-  ordering: "Reihenfolge",
-  essay: "Freitext",
-  drawing: "Zeichnung",
-  webapp: "Web-App",
-  feynman: "Feynman-Erklärung",
-  scenario: "Branching-Szenario",
-  coding: "Programmierung",
-  photo: "Foto-Aufgabe",
-};
-
-function TaskTypeFilter({ selected, onChange }) {
-  const allKeys = Object.keys(GENERATABLE_TYPES);
+function TaskTypeFilter({ selected, onChange, availableTypes }) {
+  const allKeys = Object.keys(availableTypes);
   const allSelected = selected.length === allKeys.length;
 
   function toggleType(type) {
@@ -61,7 +46,7 @@ function TaskTypeFilter({ selected, onChange }) {
         >
           Alle
         </button>
-        {Object.entries(GENERATABLE_TYPES).map(([key, label]) => (
+        {Object.entries(availableTypes).map(([key, label]) => (
           <button
             type="button"
             key={key}
@@ -534,9 +519,14 @@ function CodingLanguageSelector({ selected, onChange, visible }) {
 }
 
 function DocumentImportModal({ poolId, onClose, onImported }) {
+  const { filteredTypes } = useEnabledTaskTypes();
   const [files, setFiles] = useState([]);
-  const [allowedTypes, setAllowedTypes] = useState(Object.keys(GENERATABLE_TYPES));
+  const [allowedTypes, setAllowedTypes] = useState([]);
   const [codingLanguage, setCodingLanguage] = useState("python");
+
+  useEffect(() => {
+    setAllowedTypes(Object.keys(filteredTypes));
+  }, [Object.keys(filteredTypes).join(",")]);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState("");
@@ -670,7 +660,7 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
               </div>
             )}
             <p className="qd-hint">Die KI analysiert jedes Dokument einzeln und erstellt automatisch passende Aufgaben.</p>
-            <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} />
+            <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} availableTypes={filteredTypes} />
             <CodingLanguageSelector
               selected={codingLanguage}
               onChange={setCodingLanguage}
@@ -724,12 +714,17 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
 }
 
 function AiGenerateModal({ poolId, onClose, onGenerated }) {
+  const { filteredTypes } = useEnabledTaskTypes();
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState("mittel");
   const [instructions, setInstructions] = useState("");
-  const [allowedTypes, setAllowedTypes] = useState(Object.keys(GENERATABLE_TYPES));
+  const [allowedTypes, setAllowedTypes] = useState([]);
   const [codingLanguage, setCodingLanguage] = useState("python");
+
+  useEffect(() => {
+    setAllowedTypes(Object.keys(filteredTypes));
+  }, [Object.keys(filteredTypes).join(",")]);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -839,7 +834,7 @@ function AiGenerateModal({ poolId, onClose, onGenerated }) {
                 rows={3}
               />
             </div>
-            <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} />
+            <TaskTypeFilter selected={allowedTypes} onChange={setAllowedTypes} availableTypes={filteredTypes} />
             <CodingLanguageSelector
               selected={codingLanguage}
               onChange={setCodingLanguage}

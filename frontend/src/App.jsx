@@ -16,6 +16,7 @@ import ResultView from "./components/Student/ResultView";
 import DuelJoin from "./components/Duel/DuelJoin";
 import DuelStudentGame from "./components/Duel/DuelStudentGame";
 import DuelTeacherSetup from "./components/Duel/DuelTeacherSetup";
+import Settings from "./components/Teacher/Settings";
 import DuelTeacherLive from "./components/Duel/DuelTeacherLive";
 
 function ProtectedRoute({ children }) {
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="tasks" element={<TaskPool />} />
           <Route path="exams" element={<ExamBuilder />} />
           <Route path="duels" element={<DuelTeacherSetup />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="exams/:examId/monitor" element={<LiveMonitor />} />
           <Route path="exams/:examId/results" element={<Results />} />
           <Route path="exams/:examId/results/:sessionId" element={<StudentResult />} />

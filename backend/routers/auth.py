@@ -94,6 +94,37 @@ async def login(req: LoginRequest, db: aiosqlite.Connection = Depends(get_db)):
     return TokenResponse(token=token)
 
 
+@router.get("/settings")
+async def get_settings(
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Get all teacher settings (excluding password hash)."""
+    cursor = await db.execute(
+        "SELECT key, value FROM settings WHERE key != ?", (TEACHER_PASSWORD_HASH_KEY,)
+    )
+    rows = await cursor.fetchall()
+    return {row[0]: row[1] for row in rows}
+
+
+@router.put("/settings")
+async def update_settings(
+    body: dict,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Update teacher settings (key-value pairs)."""
+    for key, value in body.items():
+        if key == TEACHER_PASSWORD_HASH_KEY:
+            continue  # Never allow password hash to be set via this endpoint
+        await db.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            (key, str(value)),
+        )
+    await db.commit()
+    return {"message": "Einstellungen gespeichert"}
+
+
 @router.post("/reset-all")
 async def reset_all(
     db: aiosqlite.Connection = Depends(get_db),
