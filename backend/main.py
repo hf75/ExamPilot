@@ -67,8 +67,11 @@ if frontend_dist.exists():
         file_path = frontend_dist / full_path
         if file_path.is_file():
             return FileResponse(file_path)
-        # Otherwise serve index.html for client-side routing
-        return FileResponse(frontend_dist / "index.html")
+        # index.html must never be cached — it references hashed JS/CSS bundles
+        return FileResponse(
+            frontend_dist / "index.html",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
 
 
 if __name__ == "__main__":

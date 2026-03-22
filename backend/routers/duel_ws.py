@@ -7,6 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from services.duel_engine import (
     get_room, add_player, remove_player, start_game,
     submit_answer, advance_round, send_to_host, serialize_lobby,
+    select_pair, random_pair, end_game_early,
 )
 
 logger = logging.getLogger("uvicorn.error")
@@ -92,6 +93,20 @@ async def duel_websocket(websocket: WebSocket, room_code: str):
                     answer = str(msg.get("answer", ""))
                     logger.info("Duel WS answer: room=%s player=%s", room_code, player_id)
                     await submit_answer(room, player_id, answer)
+
+            elif action == "select_pair":
+                if is_host:
+                    p1 = msg.get("player1_id", "")
+                    p2 = msg.get("player2_id", "")
+                    await select_pair(room, p1, p2)
+
+            elif action == "random_pair":
+                if is_host:
+                    await random_pair(room)
+
+            elif action == "end_game":
+                if is_host:
+                    await end_game_early(room)
 
             elif action == "next_round":
                 if is_host:

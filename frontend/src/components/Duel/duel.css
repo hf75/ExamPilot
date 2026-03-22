@@ -1877,6 +1877,294 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* 1v1 Pair Selection */
+.duel-pair-selection {
+  text-align: center;
+  max-width: 700px;
+  width: 100%;
+}
+
+.duel-pair-title {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  color: var(--duel-cyan);
+}
+
+.duel-pair-subtitle {
+  color: var(--duel-text-dim);
+  margin-bottom: 24px;
+}
+
+.duel-pair-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.duel-pair-player {
+  padding: 14px 24px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  background: var(--duel-surface);
+  color: var(--duel-text);
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.duel-pair-player:hover {
+  border-color: var(--duel-cyan);
+  transform: scale(1.05);
+}
+
+.duel-pair-player.selected {
+  border-color: var(--duel-cyan);
+  background: rgba(0, 240, 255, 0.15);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+  color: var(--duel-cyan);
+}
+
+.duel-pair-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+
+.duel-btn-random {
+  background: linear-gradient(135deg, var(--duel-cyan), var(--duel-green));
+  color: #000;
+  padding: 12px 32px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.duel-btn-random:hover {
+  transform: scale(1.05);
+}
+
+.duel-btn-end {
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: var(--duel-text-dim);
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.duel-btn-end:hover {
+  border-color: var(--duel-red);
+  color: var(--duel-red);
+}
+
+.duel-pair-player-name {
+  display: block;
+}
+
+.duel-pair-player-record {
+  display: block;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+/* Match Tracker */
+.duel-match-tracker {
+  text-align: left;
+  margin-top: 8px;
+}
+
+.duel-match-tracker h3 {
+  font-size: 0.9rem;
+  color: var(--duel-text-dim);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.duel-match-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.duel-match-card {
+  background: var(--duel-surface);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 16px;
+  min-width: 200px;
+}
+
+.duel-match-card.match-enter {
+  animation: matchSlideIn 0.4s ease;
+}
+
+@keyframes matchSlideIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.duel-match-round {
+  font-size: 0.7rem;
+  color: var(--duel-text-dim);
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.duel-match-players {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.duel-match-p {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.9rem;
+}
+
+.duel-match-p.won {
+  font-weight: 700;
+}
+
+.duel-match-p.won .duel-match-name {
+  color: var(--duel-green);
+}
+
+.duel-match-p.wrong .duel-match-name {
+  color: var(--duel-red);
+  opacity: 0.7;
+}
+
+.duel-match-vs {
+  font-size: 0.7rem;
+  color: var(--duel-text-dim);
+  font-weight: 700;
+}
+
+.duel-match-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.duel-match-dot.green {
+  background: var(--duel-green);
+  box-shadow: 0 0 6px var(--duel-green);
+}
+
+.duel-match-dot.red {
+  background: var(--duel-red);
+  box-shadow: 0 0 6px var(--duel-red);
+}
+
+.duel-match-crown {
+  color: var(--duel-yellow);
+  font-size: 1rem;
+}
+
+/* Per-player timeline */
+.duel-player-timelines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.duel-player-timeline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.duel-timeline-name {
+  width: 100px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.duel-timeline-dots {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.duel-timeline-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.duel-timeline-dot.green {
+  background: var(--duel-green);
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+}
+
+.duel-timeline-dot.red {
+  background: var(--duel-red);
+  box-shadow: 0 0 8px rgba(255, 68, 68, 0.4);
+}
+
+.duel-timeline-dot.star::after {
+  content: "\2605";
+  position: absolute;
+  top: -2px;
+  left: 3px;
+  font-size: 0.75rem;
+  color: #fff;
+}
+
+.duel-timeline-dot.dot-pop {
+  animation: dotPop 0.3s ease both;
+}
+
+@keyframes dotPop {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.duel-timeline-score {
+  font-size: 0.8rem;
+  color: var(--duel-text-dim);
+  flex-shrink: 0;
+  width: 35px;
+  text-align: right;
+}
+
+.duel-spectator-badge {
+  background: rgba(0, 240, 255, 0.15);
+  color: var(--duel-cyan);
+  padding: 8px 20px;
+  border-radius: 12px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
 /* Prepared quiz section on setup page */
 .duel-prepared-section {
   margin-top: 24px;

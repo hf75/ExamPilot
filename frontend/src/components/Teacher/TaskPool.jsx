@@ -3,6 +3,7 @@ import { api } from "../../api/client";
 import { toast } from "../shared/Toast";
 import useEnabledTaskTypes from "../../hooks/useEnabledTaskTypes";
 import TaskEditor from "./TaskEditor";
+import QuestionRenderer from "../Questions/QuestionRenderer";
 import Markdown from "../Markdown";
 
 const TASK_TYPES = {
@@ -79,6 +80,7 @@ export default function TaskPool() {
   const [renameValue, setRenameValue] = useState("");
   const [newPoolName, setNewPoolName] = useState("");
   const [showNewPool, setShowNewPool] = useState(false);
+  const [previewTaskId, setPreviewTaskId] = useState(null);
 
   useEffect(() => {
     loadPools();
@@ -412,6 +414,12 @@ export default function TaskPool() {
                 </div>
               )}
               <div className="task-actions">
+                <button
+                  className={`btn-small ${previewTaskId === task.id ? "btn-small-active" : ""}`}
+                  onClick={() => setPreviewTaskId(previewTaskId === task.id ? null : task.id)}
+                >
+                  {previewTaskId === task.id ? "Vorschau schließen" : "Vorschau"}
+                </button>
                 <button className="btn-small" onClick={() => setEditingTask(task)}>
                   Bearbeiten
                 </button>
@@ -479,6 +487,20 @@ export default function TaskPool() {
                   <button className="btn-small" onClick={() => setAiEditTask(null)}>
                     Abbrechen
                   </button>
+                </div>
+              )}
+
+              {previewTaskId === task.id && (
+                <div className="task-preview-box">
+                  <div className="task-preview-label">Schüler-Vorschau</div>
+                  <div className="task-preview-content">
+                    <QuestionRenderer
+                      task={{ ...task, question_data: typeof task.question_data === "string" ? JSON.parse(task.question_data || "{}") : (task.question_data || {}) }}
+                      answer=""
+                      onChange={() => {}}
+                      disabled={false}
+                    />
+                  </div>
                 </div>
               )}
             </div>

@@ -29,6 +29,9 @@ export default function useDuelSocket(roomCode, onConnect) {
     mode: "duel",
     winner: null,
     roomCode: roomCode,
+    activePair: null,
+    pairHistory: [],
+    isSpectator: false,
     correctInfo: null,
     playerResults: [],
     eliminations: [],
@@ -170,6 +173,24 @@ export default function useDuelSocket(roomCode, onConnect) {
           case "player_left":
             return { ...prev, totalPlayers: data.player_count };
 
+          case "pair_selection":
+            return {
+              ...prev,
+              phase: "pair_selection",
+              players: data.players || prev.players,
+              pairHistory: data.pair_history || prev.pairHistory,
+              activePair: null,
+              isSpectator: false,
+            };
+
+          case "pair_selected":
+            return {
+              ...prev,
+              phase: "countdown",
+              activePair: data,
+              isSpectator: prev.myPlayerId ? (prev.myPlayerId !== data.player1?.id && prev.myPlayerId !== data.player2?.id) : false,
+            };
+
           case "game_starting":
             return { ...prev, phase: "countdown" };
 
@@ -187,6 +208,8 @@ export default function useDuelSocket(roomCode, onConnect) {
               correctInfo: null,
               playerResults: [],
               eliminations: [],
+              // Preserve spectator state from pair_selected
+              isSpectator: prev.isSpectator,
             };
 
           case "player_answered":
@@ -234,6 +257,7 @@ export default function useDuelSocket(roomCode, onConnect) {
               rankings: data.rankings || [],
               winner: data.winner,
               mode: data.mode || prev.mode,
+              pairHistory: data.pair_history || prev.pairHistory,
             };
 
           case "error":

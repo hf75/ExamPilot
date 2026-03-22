@@ -83,6 +83,12 @@ export default function DuelStudentGame() {
         />
       )}
 
+      {phase === "pair_selection" && (
+        <div className="duel-center-message">
+          <p>Der Lehrer wählt das nächste Duell-Paar...</p>
+        </div>
+      )}
+
       {phase === "countdown" && <DuelCountdown />}
 
       {phase === "question" && (
@@ -96,7 +102,16 @@ export default function DuelStudentGame() {
               Runde {gameState.round}/{gameState.totalRounds}
             </span>
           </div>
-          {gameState.myAlive ? (
+          {gameState.isSpectator ? (
+            <div className="duel-eliminated-spectator">
+              <div className="duel-spectator-badge">Zuschauer</div>
+              <p>
+                {gameState.activePair
+                  ? `${gameState.activePair.player1?.name} vs ${gameState.activePair.player2?.name}`
+                  : "Du schaust zu."}
+              </p>
+            </div>
+          ) : gameState.myAlive ? (
             <DuelQuestion
               question={gameState.currentQuestion}
               timerSeconds={gameState.timerSeconds}

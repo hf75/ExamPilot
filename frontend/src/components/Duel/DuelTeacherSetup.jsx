@@ -164,6 +164,10 @@ export default function DuelTeacherSetup() {
                 <strong>Battle Royale</strong>
                 <small>Ganze Klasse, falsche Antwort = raus</small>
               </button>
+              <button type="button" className={`duel-mode-btn ${mode === "1v1" ? "active" : ""}`} onClick={() => setMode("1v1")}>
+                <strong>1:1 Duell</strong>
+                <small>Lehrer wählt 2 Spieler, Rest schaut zu</small>
+              </button>
             </div>
           </div>
 

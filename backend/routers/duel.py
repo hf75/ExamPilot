@@ -24,7 +24,7 @@ async def create_duel_room(
 ):
     cleanup_stale_rooms()
 
-    if req.mode not in ("duel", "royale"):
+    if req.mode not in ("duel", "royale", "1v1"):
         raise HTTPException(status_code=400, detail="Modus muss 'duel' oder 'royale' sein")
     if not req.pool_ids and not req.task_ids:
         raise HTTPException(status_code=400, detail="Mindestens einen Pool oder Aufgaben auswählen")

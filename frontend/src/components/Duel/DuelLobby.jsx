@@ -35,7 +35,7 @@ export default function DuelLobby({ players, roomCode, mode, isHost, onStart }) 
         <span className="duel-room-label">Raum-Code</span>
         <span className="duel-room-code-big">{roomCode}</span>
         <span className="duel-mode-badge">
-          {mode === "royale" ? "Battle Royale" : "Klassisches Duell"}
+          {mode === "royale" ? "Battle Royale" : mode === "1v1" ? "1:1 Duell" : "Klassisches Duell"}
         </span>
       </div>
 

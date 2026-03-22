@@ -492,6 +492,38 @@ a:hover {
   color: var(--text-primary);
 }
 
+.btn-small-active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.btn-small-active:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: white;
+}
+
+.task-preview-box {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.task-preview-label {
+  background: rgba(0, 0, 0, 0.03);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.task-preview-content {
+  padding: 16px;
+}
+
 .btn-danger {
   border-color: rgba(244, 63, 94, 0.3);
   color: var(--error);

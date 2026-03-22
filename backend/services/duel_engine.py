@@ -32,7 +32,7 @@ class Player:
 @dataclass
 class GameRoom:
     room_code: str
-    mode: str  # "duel" or "royale"
+    mode: str  # "duel", "royale", or "1v1"
     phase: str = "lobby"
     host_ws: Optional[WebSocket] = None
     players: dict = field(default_factory=dict)  # id -> Player
@@ -45,6 +45,9 @@ class GameRoom:
     pool_ids: list = field(default_factory=list)
     base_points: int = 100
     created_at: float = field(default_factory=time.time)
+    # 1v1 mode
+    active_pair: list = field(default_factory=list)  # two player IDs
+    pair_history: list = field(default_factory=list)  # [{p1, p2, winner, ...}]
 
 
 _rooms: dict[str, GameRoom] = {}
@@ -325,9 +328,17 @@ def _get_correct_info(task: dict) -> dict:
 async def start_game(room: GameRoom):
     if room.phase != "lobby":
         return
-    min_players = 2 if room.mode == "duel" else 2
-    if len(room.players) < min_players:
-        await send_to_host(room, "error", {"message": f"Mindestens {min_players} Spieler nötig"})
+    if len(room.players) < 2:
+        await send_to_host(room, "error", {"message": "Mindestens 2 Spieler nötig"})
+        return
+
+    if room.mode == "1v1":
+        # Go to pair selection instead of directly starting
+        room.phase = "pair_selection"
+        await broadcast_to_room(room, "pair_selection", {
+            "players": [{"id": p.id, "name": p.name} for p in room.players.values()],
+            "pair_history": room.pair_history,
+        })
         return
 
     room.phase = "countdown"
@@ -335,6 +346,53 @@ async def start_game(room: GameRoom):
 
     await asyncio.sleep(3)
     await _send_question(room)
+
+
+async def select_pair(room: GameRoom, p1_id: str, p2_id: str):
+    """Teacher selects two players for a 1v1 round."""
+    if room.phase != "pair_selection":
+        return
+    p1 = room.players.get(p1_id)
+    p2 = room.players.get(p2_id)
+    if not p1 or not p2 or p1_id == p2_id:
+        await send_to_host(room, "error", {"message": "Ungültige Spielerauswahl"})
+        return
+    if room.current_round >= room.total_rounds:
+        await _end_game(room)
+        return
+
+    room.active_pair = [p1_id, p2_id]
+    await broadcast_to_room(room, "pair_selected", {
+        "player1": {"id": p1.id, "name": p1.name},
+        "player2": {"id": p2.id, "name": p2.name},
+    })
+
+    # Reset pair players' round state
+    p1.current_answer = None
+    p1.answer_time = None
+    p1.correct_this_round = None
+    p2.current_answer = None
+    p2.answer_time = None
+    p2.correct_this_round = None
+
+    await asyncio.sleep(3)
+    await _send_question(room)
+
+
+async def random_pair(room: GameRoom):
+    """Randomly select two players for a 1v1 round."""
+    if room.phase != "pair_selection":
+        return
+    player_ids = list(room.players.keys())
+    if len(player_ids) < 2:
+        return
+    pair = random.sample(player_ids, 2)
+    await select_pair(room, pair[0], pair[1])
+
+
+async def end_game_early(room: GameRoom):
+    """Teacher ends the game early."""
+    await _end_game(room)
 
 
 async def _send_question(room: GameRoom):
@@ -389,6 +447,9 @@ async def submit_answer(room: GameRoom, player_id: str, answer: str):
         return
     if not player.alive:
         return
+    # 1v1 mode: only the active pair can answer
+    if room.mode == "1v1" and player_id not in room.active_pair:
+        return
 
     player.current_answer = answer
     player.answer_time = time.time()
@@ -416,7 +477,10 @@ async def submit_answer(room: GameRoom, player_id: str, answer: str):
             player.alive = False
 
     # Notify everyone that someone answered
-    alive_players = [p for p in room.players.values() if p.alive and p.ws]
+    if room.mode == "1v1":
+        alive_players = [room.players[pid] for pid in room.active_pair if pid in room.players]
+    else:
+        alive_players = [p for p in room.players.values() if p.alive and p.ws]
     answered_count = sum(1 for p in alive_players if p.current_answer is not None)
     await broadcast_to_room(room, "player_answered", {
         "player_id": player_id,
@@ -449,7 +513,12 @@ async def _reveal_answers(room: GameRoom):
 
     player_results = []
     eliminations = []
-    for p in room.players.values():
+    players_to_show = (
+        [room.players[pid] for pid in room.active_pair if pid in room.players]
+        if room.mode == "1v1"
+        else room.players.values()
+    )
+    for p in players_to_show:
         points_earned = 0
         if p.correct_this_round:
             points_earned = calculate_score(
@@ -508,6 +577,35 @@ async def _show_scoreboard(room: GameRoom):
     elif room.current_round >= room.total_rounds:
         await asyncio.sleep(3)
         await _end_game(room)
+    elif room.mode == "1v1":
+        # Record pair result and return to pair selection
+        if len(room.active_pair) == 2:
+            p1 = room.players.get(room.active_pair[0])
+            p2 = room.players.get(room.active_pair[1])
+            if p1 and p2:
+                winner_id = None
+                if p1.correct_this_round and not p2.correct_this_round:
+                    winner_id = p1.id
+                elif p2.correct_this_round and not p1.correct_this_round:
+                    winner_id = p2.id
+                elif p1.correct_this_round and p2.correct_this_round:
+                    winner_id = p1.id if (p1.answer_time or 999) < (p2.answer_time or 999) else p2.id
+
+                room.pair_history.append({
+                    "player1": {"id": p1.id, "name": p1.name, "correct": bool(p1.correct_this_round)},
+                    "player2": {"id": p2.id, "name": p2.name, "correct": bool(p2.correct_this_round)},
+                    "winner_id": winner_id,
+                    "round": room.current_round,
+                })
+            room.active_pair = []
+
+        await asyncio.sleep(4)
+        if room.phase == "scoreboard":
+            room.phase = "pair_selection"
+            await broadcast_to_room(room, "pair_selection", {
+                "players": [{"id": p.id, "name": p.name} for p in room.players.values()],
+                "pair_history": room.pair_history,
+            })
     else:
         # Auto-advance to next round after showing scoreboard
         await asyncio.sleep(5)
@@ -538,6 +636,7 @@ async def _end_game(room: GameRoom):
         ],
         "winner": {"id": winner.id, "name": winner.name, "score": winner.score} if winner else None,
         "mode": room.mode,
+        "pair_history": room.pair_history if room.mode == "1v1" else [],
     })
 
 

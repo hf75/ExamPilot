@@ -5,6 +5,7 @@ import DuelLobby from "./DuelLobby";
 import DuelCountdown from "./DuelCountdown";
 import DuelScoreboard from "./DuelScoreboard";
 import DuelVictory from "./DuelVictory";
+import DuelPairSelection from "./DuelPairSelection";
 import Markdown from "../Markdown";
 import "./duel.css";
 
@@ -64,6 +65,17 @@ export default function DuelTeacherLive() {
           mode={gameState.mode}
           isHost={true}
           onStart={() => send("start_game")}
+        />
+      )}
+
+      {phase === "pair_selection" && (
+        <DuelPairSelection
+          players={gameState.players}
+          pairHistory={gameState.pairHistory}
+          questionsLeft={gameState.totalRounds - gameState.round}
+          onSelectPair={(p1, p2) => send("select_pair", { player1_id: p1, player2_id: p2 })}
+          onRandomPair={() => send("random_pair")}
+          onEndGame={() => send("end_game")}
         />
       )}
 
