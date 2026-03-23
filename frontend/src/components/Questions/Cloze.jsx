@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import InlineMarkdown from "./InlineMarkdown";
 
 export default function Cloze({ task, questionData, answer, onChange, disabled }) {
   const gaps = questionData.gaps || [];
@@ -34,8 +35,8 @@ export default function Cloze({ task, questionData, answer, onChange, disabled }
     });
   }
 
-  // Split text by gap markers [[1]], [[2]], etc.
-  const text = task.text || "";
+  // Split text by gap markers [[1]], [[2]], [1], [2], or **[1]** etc.
+  const text = (task.text || "").replace(/\*\*\[(\d+)\]\*\*/g, "[[$1]]").replace(/(?<!\[)\[(\d+)\](?!\])/g, "[[$1]]");
   const parts = text.split(/\[\[(\d+)\]\]/);
 
   return (
@@ -43,8 +44,8 @@ export default function Cloze({ task, questionData, answer, onChange, disabled }
       <div className="cloze-text">
         {parts.map((part, i) => {
           if (i % 2 === 0) {
-            // Regular text
-            return <span key={i}>{part}</span>;
+            // Regular text with inline markdown
+            return <span key={i}><InlineMarkdown>{part}</InlineMarkdown></span>;
           }
           // Gap number (1-based in text, 0-based in array)
           const gapIdx = parseInt(part) - 1;

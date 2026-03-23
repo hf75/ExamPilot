@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import InlineMarkdown from "./InlineMarkdown";
 
 export default function Matching({ task, questionData, answer, onChange, disabled }) {
   const pairs = questionData.pairs || [];
@@ -52,7 +53,7 @@ export default function Matching({ task, questionData, answer, onChange, disable
         <tbody>
           {pairs.map((pair, idx) => (
             <tr key={idx}>
-              <td className="matching-question">{pair.question}</td>
+              <td className="matching-question"><InlineMarkdown>{pair.question}</InlineMarkdown></td>
               <td className="matching-arrow">&rarr;</td>
               <td className="matching-select">
                 <select

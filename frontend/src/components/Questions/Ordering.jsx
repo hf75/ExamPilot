@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import InlineMarkdown from "./InlineMarkdown";
 
 export default function Ordering({ task, questionData, answer, onChange, disabled }) {
   const items = questionData.items || [];
@@ -89,7 +90,7 @@ export default function Ordering({ task, questionData, answer, onChange, disable
             onDragEnd={handleDragEnd}
           >
             <span className="ordering-number">{pos + 1}.</span>
-            <span className="ordering-text">{items[itemIdx]}</span>
+            <span className="ordering-text"><InlineMarkdown>{items[itemIdx]}</InlineMarkdown></span>
             {!disabled && (
               <span className="ordering-buttons">
                 <button onClick={() => moveUp(pos)} disabled={pos === 0} title="Nach oben">&uarr;</button>

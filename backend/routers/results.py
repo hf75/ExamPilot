@@ -183,12 +183,20 @@ async def get_live_progress(
                 "grading_status": row[2],
             }
 
+        # Count disputed answers
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM answers WHERE session_id = ? AND disputed = TRUE",
+            (sid,),
+        )
+        dispute_count = (await cursor.fetchone())[0]
+
         act = activity.get(sid, {})
         students.append({
             **s,
             "answers": answers,
             "current_task_id": act.get("task_id"),
             "last_seen": act.get("last_seen"),
+            "dispute_count": dispute_count,
         })
 
     return {"tasks": tasks, "students": students}

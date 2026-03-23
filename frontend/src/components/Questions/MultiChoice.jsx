@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import InlineMarkdown from "./InlineMarkdown";
 
 export default function MultiChoice({ task, questionData, answer, onChange, disabled }) {
   const single = questionData.single !== false;
@@ -63,7 +64,7 @@ export default function MultiChoice({ task, questionData, answer, onChange, disa
             onChange={() => handleChange(idx)}
             disabled={disabled}
           />
-          <span className="mc-text">{answers[idx]?.text}</span>
+          <span className="mc-text"><InlineMarkdown>{answers[idx]?.text}</InlineMarkdown></span>
         </label>
       ))}
     </div>

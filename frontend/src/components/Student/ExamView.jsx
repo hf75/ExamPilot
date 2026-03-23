@@ -18,7 +18,9 @@ export default function ExamView() {
   const [timeLeft, setTimeLeft] = useState(null);
   const [saveErrors, setSaveErrors] = useState([]);
   const [flagged, setFlagged] = useState(new Set());
-  const [saveStatus, setSaveStatus] = useState(""); // "", "saving", "saved", "error"
+  const [saveStatus, setSaveStatus] = useState("");
+  const touchedTasks = useRef(new Set());
+  const lastNavTime = useRef(Date.now()); // "", "saving", "saved", "error"
   const autoSaveTimer = useRef(null);
   const isSubmittingRef = useRef(false);
 
@@ -71,10 +73,11 @@ export default function ExamView() {
       const data = await api.get(`/api/student/session/${sessionId}`);
       setSession(data);
 
-      // Load existing answers into state
+      // Load existing answers into state — mark as touched since they were previously saved
       const answerMap = {};
       for (const a of data.answers) {
         answerMap[a.task_id] = a.student_answer || "";
+        if (a.student_answer) touchedTasks.current.add(a.task_id);
       }
       setAnswers(answerMap);
     } catch (err) {
@@ -88,15 +91,13 @@ export default function ExamView() {
   // Auto-save answer (debounced) — saves only, no grading during exam
   const autoSave = useCallback(
     async (taskId, answer) => {
-      setSaveStatus("saving");
       try {
         await api.post("/api/student/answer", {
           session_id: parseInt(sessionId),
           task_id: taskId,
           student_answer: answer,
         });
-        setSaveStatus("saved");
-        setTimeout(() => setSaveStatus((s) => s === "saved" ? "" : s), 2000);
+        setSaveStatus("");
       } catch {
         setSaveStatus("error");
         toast.error("Antwort konnte nicht gespeichert werden");
@@ -119,6 +120,7 @@ export default function ExamView() {
       autoSave(currentT.id, answers[currentT.id]);
     }
 
+    lastNavTime.current = Date.now();
     setCurrentTaskIndex(newIndex);
   }
 
@@ -135,6 +137,10 @@ export default function ExamView() {
   }
 
   function handleAnswerChange(taskId, value) {
+    // Ignore onChange calls within 200ms of navigation — these are mount/init calls from renderers
+    if (Date.now() - lastNavTime.current > 200) {
+      touchedTasks.current.add(taskId);
+    }
     setAnswers((prev) => ({ ...prev, [taskId]: value }));
 
     // Debounced auto-save
@@ -214,8 +220,20 @@ export default function ExamView() {
 
   const tasks = session.tasks || [];
   const currentTask = tasks[currentTaskIndex];
+  function isRealAnswer(taskId, value) {
+    if (!value || value === "" || value === "[]" || value === "{}") return false;
+    if (value === "_seen") return false;
+    try {
+      const parsed = JSON.parse(value);
+      // Cloze: array of all empty strings = not answered
+      if (Array.isArray(parsed) && parsed.every((v) => v === "" || v === null)) return false;
+    } catch {}
+    // Only count as answered if user actually interacted with this task
+    return touchedTasks.current.has(parseInt(taskId));
+  }
+
   const answeredCount = Object.keys(answers).filter(
-    (k) => answers[k] && answers[k] !== "" && answers[k] !== "[]" && answers[k] !== "{}"
+    (k) => isRealAnswer(k, answers[k])
   ).length;
 
   function formatTime(seconds) {
@@ -242,9 +260,9 @@ export default function ExamView() {
           <span className="exam-progress">
             {answeredCount}/{tasks.length} beantwortet
           </span>
-          {saveStatus && (
-            <span className={`autosave-indicator ${saveStatus}`}>
-              {saveStatus === "saving" ? "Speichert..." : saveStatus === "saved" ? "Gespeichert" : "Fehler!"}
+          {saveStatus === "error" && (
+            <span className="autosave-indicator error">
+              Speichern fehlgeschlagen!
             </span>
           )}
           <button
@@ -262,6 +280,7 @@ export default function ExamView() {
           tasks={tasks}
           currentIndex={currentTaskIndex}
           answers={answers}
+          isRealAnswer={isRealAnswer}
           flagged={flagged}
           onSelect={handleNavigate}
           onToggleFlag={toggleFlag}

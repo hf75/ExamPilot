@@ -560,6 +560,25 @@ async def submit_exam(
             await db.commit()
             raise HTTPException(status_code=400, detail="Klassenarbeit hat keine Aufgaben")
 
+    # Create empty answer records for tasks the student never visited
+    exam_id = session_row[0] if session_row else None
+    if exam_id:
+        cursor = await db.execute(
+            """SELECT et.task_id FROM exam_tasks et
+               WHERE et.exam_id = ?
+               AND et.task_id NOT IN (SELECT task_id FROM answers WHERE session_id = ?)""",
+            (exam_id, session_id),
+        )
+        missing_tasks = [row[0] for row in await cursor.fetchall()]
+        for task_id in missing_tasks:
+            await db.execute(
+                """INSERT INTO answers (session_id, task_id, student_answer, points_awarded, is_correct, grading_status)
+                   VALUES (?, ?, '', 0, FALSE, 'graded')""",
+                (session_id, task_id),
+            )
+        if missing_tasks:
+            await db.commit()
+
     # Trigger AI grading for all ungraded AI-gradable tasks
     cursor = await db.execute(
         """SELECT a.id, t.*, a.student_answer FROM answers a

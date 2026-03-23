@@ -158,11 +158,18 @@ export default function LiveMonitor() {
             {submitted.map((s) => (
               <div
                 key={s.session_id}
-                className="monitor-card submitted"
+                className={`monitor-card submitted ${s.dispute_count > 0 ? "has-disputes" : ""}`}
                 onClick={() => navigate(`/teacher/exams/${examId}/results/${s.session_id}`)}
                 style={{ cursor: "pointer" }}
               >
-                <div className="monitor-card-name">{s.student_name}</div>
+                <div className="monitor-card-name">
+                  {s.student_name}
+                  {s.dispute_count > 0 && (
+                    <span className="monitor-dispute-badge" title={`${s.dispute_count} Einspruch/Einsprüche`}>
+                      {s.dispute_count}
+                    </span>
+                  )}
+                </div>
                 <div className="monitor-card-result">
                   {s.total_points ?? "–"}/{s.max_points ?? "–"} Pkt.
                 </div>

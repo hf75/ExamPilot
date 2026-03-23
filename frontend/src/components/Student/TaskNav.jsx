@@ -1,10 +1,10 @@
-export default function TaskNav({ tasks, currentIndex, answers, flagged, onSelect, onToggleFlag }) {
+export default function TaskNav({ tasks, currentIndex, answers, isRealAnswer, flagged, onSelect, onToggleFlag }) {
   return (
     <div className="task-nav-sidebar">
       <h4>Aufgaben</h4>
       <div className="task-nav-list">
         {tasks.map((task, index) => {
-          const isAnswered = !!answers[task.id];
+          const isAnswered = isRealAnswer ? isRealAnswer(task.id, answers[task.id]) : !!answers[task.id];
           const isCurrent = index === currentIndex;
           const isFlagged = flagged?.has(task.id);
 

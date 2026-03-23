@@ -721,13 +721,21 @@ function TaskPreview({ task, expanded, onToggle, children }) {
     photo: "Foto-Aufgabe",
   };
 
+  // Ensure question_data is parsed (API may return it as JSON string)
+  const parsedTask = {
+    ...task,
+    question_data: typeof task.question_data === "string"
+      ? JSON.parse(task.question_data || "{}")
+      : (task.question_data || {}),
+  };
+
   return (
     <div className={`task-preview-wrapper ${expanded ? "task-preview-expanded" : ""}`}>
       <div className="task-preview-header" onClick={onToggle}>
         <div className="exam-task-info">
           <strong>{task.title}</strong>
           <span className="task-type-badge">{TYPE_LABELS[task.task_type] || task.task_type}</span>
-          {!expanded && (
+          {!expanded && task.text && (
             <span className="task-text-preview">
               {task.text.substring(0, 100)}{task.text.length > 100 ? "..." : ""}
             </span>
@@ -743,13 +751,16 @@ function TaskPreview({ task, expanded, onToggle, children }) {
         <div className="task-preview-body">
           <div className="task-preview-text"><Markdown>{task.text}</Markdown></div>
           {task.hint && <div className="task-preview-hint">Hinweis: <Markdown>{task.hint}</Markdown></div>}
-          <div className="task-preview-question">
-            <QuestionRenderer
-              task={task}
-              answer=""
-              onChange={() => {}}
-              disabled={true}
-            />
+          <div className="task-preview-box">
+            <div className="task-preview-label">Schüler-Vorschau</div>
+            <div className="task-preview-content">
+              <QuestionRenderer
+                task={parsedTask}
+                answer=""
+                onChange={() => {}}
+                disabled={false}
+              />
+            </div>
           </div>
         </div>
       )}
