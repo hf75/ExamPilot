@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 
 from config import BUNDLE_DIR
 from database import init_db
-from routers import auth, tasks, exams, student, results, export, websocket, pools, duel, duel_ws
+from routers import auth, tasks, exams, student, results, export, websocket, pools, duel, duel_ws, lti
 
 
 @asynccontextmanager
@@ -43,6 +43,7 @@ app.include_router(websocket.router)
 app.include_router(pools.router)
 app.include_router(duel.router)
 app.include_router(duel_ws.router)
+app.include_router(lti.router)
 
 # Serve frontend static files in production
 # In frozen mode: frontend/dist is bundled inside BUNDLE_DIR

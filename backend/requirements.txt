@@ -9,3 +9,6 @@ reportlab==4.2.5
 PyMuPDF==1.25.3
 bcrypt==4.2.1
 PyJWT==2.10.1
+PyLTI1p3>=2.0.0
+jwcrypto>=1.5.0
+cryptography>=43.0.0

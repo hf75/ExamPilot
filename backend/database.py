@@ -169,6 +169,44 @@ async def init_db():
             )
         """)
 
+        # LTI 1.3 tables
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS lti_platforms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                issuer TEXT NOT NULL,
+                client_id TEXT NOT NULL,
+                deployment_id TEXT DEFAULT '1',
+                auth_login_url TEXT NOT NULL,
+                auth_token_url TEXT NOT NULL,
+                keyset_url TEXT NOT NULL,
+                tool_private_key TEXT NOT NULL,
+                tool_public_key TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS lti_launches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform_id INTEGER NOT NULL,
+                lti_user_id TEXT NOT NULL,
+                lti_user_name TEXT,
+                resource_link_id TEXT,
+                exam_id INTEGER,
+                session_id INTEGER,
+                ags_lineitem_url TEXT,
+                ags_endpoint TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (platform_id) REFERENCES lti_platforms(id) ON DELETE CASCADE,
+                FOREIGN KEY (exam_id) REFERENCES exams(id),
+                FOREIGN KEY (session_id) REFERENCES exam_sessions(id)
+            )
+        """)
+
+        # Migration: add lti_user_id to students for stable LTI identity
+        if not await has_column("students", "lti_user_id"):
+            await db.execute("ALTER TABLE students ADD COLUMN lti_user_id TEXT")
+
         # Indexes on foreign keys for query performance
         await db.execute("CREATE INDEX IF NOT EXISTS idx_exam_sessions_exam_id ON exam_sessions(exam_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_exam_sessions_student_id ON exam_sessions(student_id)")

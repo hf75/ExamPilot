@@ -4649,6 +4649,87 @@ a:hover {
   font-family: monospace;
 }
 
+/* LTI Settings */
+.lti-platform-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.lti-platform-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.lti-platform-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lti-platform-client {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.lti-platform-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.lti-tool-config {
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.lti-tool-config h4 {
+  margin-bottom: 10px;
+  color: var(--accent);
+}
+
+.lti-config-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  align-items: center;
+}
+
+.lti-config-grid label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.lti-config-grid code {
+  font-size: 0.85rem;
+  background: var(--surface);
+  padding: 3px 8px;
+  border-radius: 4px;
+  word-break: break-all;
+  user-select: all;
+}
+
+.lti-register-form {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.lti-register-form h4 {
+  margin-bottom: 8px;
+}
+
 /* Toast Notifications */
 .toast-container {
   position: fixed;
