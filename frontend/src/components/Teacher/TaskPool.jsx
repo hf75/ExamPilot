@@ -327,7 +327,7 @@ export default function TaskPool() {
               className="btn-secondary"
               onClick={async () => {
                 try {
-                  const url = `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/tasks/export-moodle-xml${selectedPoolId ? `?pool_id=${selectedPoolId}` : ""}`;
+                  const url = `${import.meta.env.VITE_API_URL || window.location.origin}/api/tasks/export-moodle-xml${selectedPoolId ? `?pool_id=${selectedPoolId}` : ""}`;
                   const res = await fetch(url, {
                     headers: { Authorization: `Bearer ${localStorage.getItem("teacher_token")}` },
                   });
@@ -584,7 +584,7 @@ function DocumentImportModal({ poolId, onClose, onImported }) {
           formData.append("coding_language", codingLanguage);
         }
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/tasks/import-document`,
+          `${import.meta.env.VITE_API_URL || window.location.origin}/api/tasks/import-document`,
           {
             method: "POST",
             headers: {
@@ -923,7 +923,7 @@ function MoodleImportModal({ poolId, onClose, onImported }) {
       const formData = new FormData();
       formData.append("file", file);
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/tasks/import-moodle-xml`,
+        `${import.meta.env.VITE_API_URL || window.location.origin}/api/tasks/import-moodle-xml`,
         {
           method: "POST",
           headers: {

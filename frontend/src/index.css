@@ -2376,14 +2376,13 @@ a:hover {
 }
 
 .pool-sidebar {
-  width: 240px;
-  min-width: 240px;
+  width: 220px;
+  min-width: 220px;
   background: var(--bg-card);
   border-right: 1px solid var(--border);
-  padding: 16px;
   display: flex;
   flex-direction: column;
-  margin: -32px -24px -32px -24px;
+  margin: -32px 0 -32px -24px;
   padding: 24px 16px;
 }
 
@@ -2522,7 +2521,7 @@ a:hover {
 .task-pool-layout .task-pool {
   flex: 1;
   min-width: 0;
-  padding-left: 24px;
+  padding-left: 16px;
 }
 
 /* Multi-file import */

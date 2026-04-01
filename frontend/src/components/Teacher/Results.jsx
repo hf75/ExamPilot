@@ -96,7 +96,7 @@ export default function Results() {
   function handleExportPdf() {
     const token = localStorage.getItem("teacher_token");
     window.open(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/exams/${examId}/export/pdf?token=${token}`,
+      `${import.meta.env.VITE_API_URL || window.location.origin}/api/exams/${examId}/export/pdf?token=${token}`,
       "_blank"
     );
   }
@@ -104,7 +104,7 @@ export default function Results() {
   function handleExportCsv() {
     const token = localStorage.getItem("teacher_token");
     window.open(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/exams/${examId}/export/csv?token=${token}`,
+      `${import.meta.env.VITE_API_URL || window.location.origin}/api/exams/${examId}/export/csv?token=${token}`,
       "_blank"
     );
   }
