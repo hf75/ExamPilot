@@ -29,8 +29,9 @@ def _parse_json_response(text: str) -> list:
     # First attempt: parse as-is
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as e:
+        logger.warning("JSON parse attempt 1 failed: %s (pos %d, around: ...%s...)",
+                       e.msg, e.pos, text[max(0,e.pos-50):e.pos+50])
 
     # Repair attempt: fix common Claude JSON issues
     repaired = text
