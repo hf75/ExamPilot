@@ -72,6 +72,133 @@ a:hover {
   text-align: center;
 }
 
+/* Student Join Screen */
+.join-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+}
+
+.join-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px 36px 32px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  animation: joinFadeIn 0.4s ease-out;
+}
+
+@keyframes joinFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.join-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.join-logo {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.join-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  letter-spacing: -0.5px;
+}
+
+.join-subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.join-empty {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.join-empty-icon {
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.join-empty p {
+  color: var(--text-secondary);
+  margin: 4px 0;
+}
+
+.join-empty-hint {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.join-exam-single {
+  background: var(--bg-secondary);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.join-exam-single-title {
+  font-weight: 600;
+  font-size: 15px;
+  flex: 1;
+}
+
+.join-exam-single-class,
+.join-exam-single-time {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.join-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.join-footer a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.join-footer a:hover {
+  color: var(--accent);
+}
+
+.join-footer-sep {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
 .form-group {
   margin-bottom: 16px;
 }

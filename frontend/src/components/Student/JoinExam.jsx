@@ -8,6 +8,7 @@ export default function JoinExam() {
   const [selectedExam, setSelectedExam] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [joining, setJoining] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export default function JoinExam() {
       return;
     }
 
+    setJoining(true);
     try {
       const payload = { name, exam_id: parseInt(selectedExam) };
       const exam = exams.find((e) => String(e.id) === selectedExam);
@@ -31,19 +33,39 @@ export default function JoinExam() {
       navigate(`/exam/${data.session_id}`);
     } catch (err) {
       setError(err.message);
+      setJoining(false);
     }
   }
 
+  const selectedExamObj = exams.find((e) => String(e.id) === selectedExam);
+
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h1>ExamPilot</h1>
-        <h2>Anmeldung</h2>
+    <div className="join-screen">
+      <div className="join-card">
+        <div className="join-header">
+          <div className="join-logo">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <rect width="48" height="48" rx="12" fill="var(--accent)" />
+              <path d="M14 16h20v2H14zm0 6h20v2H14zm0 6h14v2H14zm18 0l4 4-4 4" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            </svg>
+          </div>
+          <h1>ExamPilot</h1>
+          <p className="join-subtitle">Digital. Einfach. Fair.</p>
+        </div>
 
         {error && <div className="error-message">{error}</div>}
 
         {exams.length === 0 ? (
-          <p className="no-exams">Aktuell keine aktive Klassenarbeit verfügbar.</p>
+          <div className="join-empty">
+            <div className="join-empty-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+            </div>
+            <p>Aktuell keine aktive Klassenarbeit verfügbar.</p>
+            <p className="join-empty-hint">Bitte warte, bis dein Lehrer eine Klassenarbeit aktiviert.</p>
+          </div>
         ) : (
           <form onSubmit={handleJoin}>
             <div className="form-group">
@@ -60,21 +82,34 @@ export default function JoinExam() {
             </div>
             <div className="form-group">
               <label htmlFor="exam">Klassenarbeit</label>
-              <select
-                id="exam"
-                value={selectedExam}
-                onChange={(e) => setSelectedExam(e.target.value)}
-                required
-              >
-                <option value="">-- Bitte auswählen --</option>
-                {exams.map((exam) => (
-                  <option key={exam.id} value={exam.id}>
-                    {exam.title} {exam.class_name ? `(${exam.class_name})` : ""}
-                  </option>
-                ))}
-              </select>
+              {exams.length === 1 ? (
+                <>
+                  <div className="join-exam-single" onClick={() => setSelectedExam(String(exams[0].id))}>
+                    <div className="join-exam-single-title">{exams[0].title}</div>
+                    {exams[0].class_name && <span className="join-exam-single-class">{exams[0].class_name}</span>}
+                    {exams[0].duration_minutes && <span className="join-exam-single-time">{exams[0].duration_minutes} Min.</span>}
+                  </div>
+                  {/* Auto-select the only exam */}
+                  {!selectedExam && (() => { setSelectedExam(String(exams[0].id)); return null; })()}
+                </>
+              ) : (
+                <select
+                  id="exam"
+                  value={selectedExam}
+                  onChange={(e) => setSelectedExam(e.target.value)}
+                  required
+                >
+                  <option value="">-- Bitte auswählen --</option>
+                  {exams.map((exam) => (
+                    <option key={exam.id} value={exam.id}>
+                      {exam.title} {exam.class_name ? `(${exam.class_name})` : ""}
+                      {exam.duration_minutes ? ` - ${exam.duration_minutes} Min.` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
-            {exams.find((e) => String(e.id) === selectedExam)?.has_password && (
+            {selectedExamObj?.has_password && (
               <div className="form-group">
                 <label htmlFor="password">Passwort</label>
                 <input
@@ -87,16 +122,16 @@ export default function JoinExam() {
                 />
               </div>
             )}
-            <button type="submit" className="btn-primary">
-              Prüfung starten
+            <button type="submit" className="btn-primary" disabled={joining}>
+              {joining ? "Wird gestartet..." : "Prüfung starten"}
             </button>
           </form>
         )}
 
-        <div className="login-footer">
-          <a href="/duel">Zum Lern-Duell →</a>
-          <span style={{ margin: "0 8px", color: "#ccc" }}>|</span>
-          <a href="/login">Lehrer-Login →</a>
+        <div className="join-footer">
+          <a href="/duel">Lern-Duell</a>
+          <span className="join-footer-sep" />
+          <a href="/login">Lehrer-Login</a>
         </div>
       </div>
     </div>
