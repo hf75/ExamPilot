@@ -23,7 +23,7 @@ def require_teacher_or_token(token: str = Query(None)):
     if token:
         verify_token(token)
         return True
-    return None
+    raise HTTPException(status_code=401, detail="Nicht autorisiert")
 
 
 @router.get("/{exam_id}/export/pdf")

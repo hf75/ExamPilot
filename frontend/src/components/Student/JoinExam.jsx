@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, setSessionToken } from "../../api/client";
 
 export default function JoinExam() {
   const [exams, setExams] = useState([]);
@@ -30,6 +30,7 @@ export default function JoinExam() {
       const exam = exams.find((e) => String(e.id) === selectedExam);
       if (exam?.has_password) payload.password = password;
       const data = await api.post("/api/student/join", payload);
+      if (data.session_token) setSessionToken(data.session_token);
       navigate(`/exam/${data.session_id}`);
     } catch (err) {
       setError(err.message);

@@ -16,6 +16,14 @@ export function isLoggedIn() {
   return !!getToken();
 }
 
+export function setSessionToken(token) {
+  sessionStorage.setItem("session_token", token);
+}
+
+export function getSessionToken() {
+  return sessionStorage.getItem("session_token");
+}
+
 async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
   const headers = { "Content-Type": "application/json", ...options.headers };
@@ -23,6 +31,12 @@ async function request(path, options = {}) {
   const token = getToken();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  // Include student session token for student API calls
+  const sessionToken = getSessionToken();
+  if (sessionToken) {
+    headers["X-Session-Token"] = sessionToken;
   }
 
   const res = await fetch(url, { ...options, headers });

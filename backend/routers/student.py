@@ -2,7 +2,9 @@ import json
 import asyncio
 import logging
 import random
-from fastapi import APIRouter, Depends, HTTPException
+import secrets
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from typing import Optional
 import aiosqlite
 
 from database import get_db
@@ -19,6 +21,18 @@ router = APIRouter(prefix="/api/student", tags=["student"])
 
 # In-memory tracking for live dashboard: {session_id: {"task_id": int, "last_seen": str}}
 _student_activity: dict[int, dict] = {}
+
+# Session tokens: {session_id: token} — validates student owns the session
+_session_tokens: dict[int, str] = {}
+
+
+def _check_session_token(session_id: int, token: Optional[str]):
+    """Verify the caller owns this specific session_id."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Session-Token fehlt")
+    expected = _session_tokens.get(session_id)
+    if not expected or expected != token:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
 
 
 @router.get("/exams")
@@ -37,8 +51,10 @@ async def list_active_exams(db: aiosqlite.Connection = Depends(get_db)):
 
 @router.post("/join")
 async def join_exam(
-    req: StudentJoinRequest, db: aiosqlite.Connection = Depends(get_db)
+    req: StudentJoinRequest, request: Request, db: aiosqlite.Connection = Depends(get_db)
 ):
+    from routers.auth import _check_rate_limit
+    _check_rate_limit(request)
     # Check exam is active
     cursor = await db.execute(
         "SELECT id, title, password FROM exams WHERE id = ? AND status = 'active'", (req.exam_id,)
@@ -72,7 +88,9 @@ async def join_exam(
     existing = await cursor.fetchone()
     if existing:
         await db.commit()
-        return {"session_id": existing[0], "message": "Bestehende Sitzung fortgesetzt"}
+        token = _session_tokens.get(existing[0]) or secrets.token_urlsafe(32)
+        _session_tokens[existing[0]] = token
+        return {"session_id": existing[0], "session_token": token, "message": "Bestehende Sitzung fortgesetzt"}
 
     # Create new session
     cursor = await db.execute(
@@ -81,14 +99,18 @@ async def join_exam(
     )
     session_id = cursor.lastrowid
     await db.commit()
+    token = secrets.token_urlsafe(32)
+    _session_tokens[session_id] = token
     await broadcast(req.exam_id, "student_joined", {"student_name": req.name, "session_id": session_id})
-    return {"session_id": session_id, "message": "Erfolgreich angemeldet"}
+    return {"session_id": session_id, "session_token": token, "message": "Erfolgreich angemeldet"}
 
 
 @router.get("/session/{session_id}")
 async def get_session(
-    session_id: int, db: aiosqlite.Connection = Depends(get_db)
+    session_id: int, db: aiosqlite.Connection = Depends(get_db),
+    x_session_token: Optional[str] = Header(None),
 ):
+    _check_session_token(session_id, x_session_token)
     cursor = await db.execute(
         """SELECT es.*, e.title as exam_title, e.duration_minutes, e.status as exam_status,
                   s.name as student_name
@@ -218,8 +240,10 @@ async def _grade_in_background(answer_id: int, task: dict, student_answer: str):
 
 @router.post("/answer")
 async def submit_answer(
-    req: AnswerSubmit, db: aiosqlite.Connection = Depends(get_db)
+    req: AnswerSubmit, db: aiosqlite.Connection = Depends(get_db),
+    x_session_token: Optional[str] = Header(None),
 ):
+    _check_session_token(req.session_id, x_session_token)
     # Verify session exists and is in progress
     cursor = await db.execute(
         "SELECT es.status, es.exam_id, e.status as exam_status FROM exam_sessions es JOIN exams e ON e.id = es.exam_id WHERE es.id = ?",
@@ -382,8 +406,10 @@ async def submit_answer(
 
 @router.get("/grading-status/{session_id}")
 async def get_grading_status(
-    session_id: int, db: aiosqlite.Connection = Depends(get_db)
+    session_id: int, db: aiosqlite.Connection = Depends(get_db),
+    x_session_token: Optional[str] = Header(None),
 ):
+    _check_session_token(session_id, x_session_token)
     """Returns grading status for all answers in a session."""
     cursor = await db.execute(
         "SELECT task_id, grading_status FROM answers WHERE session_id = ?",
@@ -395,8 +421,10 @@ async def get_grading_status(
 
 @router.post("/grade-drawing")
 async def grade_drawing(
-    req: AnswerSubmit, db: aiosqlite.Connection = Depends(get_db)
+    req: AnswerSubmit, db: aiosqlite.Connection = Depends(get_db),
+    x_session_token: Optional[str] = Header(None),
 ):
+    _check_session_token(req.session_id, x_session_token)
     """Explicitly trigger AI grading for a drawing task (called on navigation away)."""
     cursor = await db.execute(
         "SELECT id, grading_status, student_answer FROM answers WHERE session_id = ? AND task_id = ?",
@@ -426,7 +454,8 @@ async def grade_drawing(
 
 
 @router.post("/feynman-chat")
-async def feynman_chat(req: FeynmanChatRequest, db: aiosqlite.Connection = Depends(get_db)):
+async def feynman_chat(req: FeynmanChatRequest, db: aiosqlite.Connection = Depends(get_db), x_session_token: Optional[str] = Header(None)):
+    _check_session_token(req.session_id, x_session_token)
     """Get AI colleague response for a Feynman teaching dialogue."""
     # Verify session is in_progress
     cursor = await db.execute(
@@ -476,7 +505,8 @@ async def feynman_chat(req: FeynmanChatRequest, db: aiosqlite.Connection = Depen
 
 
 @router.post("/scenario-next")
-async def scenario_next(req: ScenarioNextRequest, db: aiosqlite.Connection = Depends(get_db)):
+async def scenario_next(req: ScenarioNextRequest, db: aiosqlite.Connection = Depends(get_db), x_session_token: Optional[str] = Header(None)):
+    _check_session_token(req.session_id, x_session_token)
     """Get next situation in a branching scenario."""
     # Verify session is in_progress
     cursor = await db.execute(
@@ -526,8 +556,10 @@ async def scenario_next(req: ScenarioNextRequest, db: aiosqlite.Connection = Dep
 
 @router.post("/submit/{session_id}")
 async def submit_exam(
-    session_id: int, db: aiosqlite.Connection = Depends(get_db)
+    session_id: int, db: aiosqlite.Connection = Depends(get_db),
+    x_session_token: Optional[str] = Header(None),
 ):
+    _check_session_token(session_id, x_session_token)
     # Atomically claim the session for submission to prevent double-submit
     cursor = await db.execute(
         "UPDATE exam_sessions SET status = 'submitting' WHERE id = ? AND status = 'in_progress'",
@@ -639,7 +671,8 @@ async def submit_exam(
 
 @router.post("/dispute")
 async def dispute_answer(
-    req: AnswerDispute, db: aiosqlite.Connection = Depends(get_db)
+    req: AnswerDispute, db: aiosqlite.Connection = Depends(get_db),
+    x_session_token: Optional[str] = Header(None),
 ):
     cursor = await db.execute(
         "SELECT id, session_id FROM answers WHERE id = ?", (req.answer_id,)
@@ -647,6 +680,7 @@ async def dispute_answer(
     answer = await cursor.fetchone()
     if not answer:
         raise HTTPException(status_code=404, detail="Antwort nicht gefunden")
+    _check_session_token(answer[1], x_session_token)
 
     # Verify session is submitted
     cursor = await db.execute(
@@ -666,8 +700,10 @@ async def dispute_answer(
 
 @router.get("/results/{session_id}")
 async def get_results(
-    session_id: int, db: aiosqlite.Connection = Depends(get_db)
+    session_id: int, db: aiosqlite.Connection = Depends(get_db),
+    x_session_token: Optional[str] = Header(None),
 ):
+    _check_session_token(session_id, x_session_token)
     cursor = await db.execute(
         """SELECT es.*, e.title as exam_title, e.show_results_immediately, e.grading_scale,
                   s.name as student_name
@@ -693,6 +729,7 @@ async def get_results(
            WHERE a.session_id = ?""",
         (session_id,),
     )
+    show_results = session_dict.get("show_results_immediately", True)
     answers = []
     for row in await cursor.fetchall():
         a = dict(row)
@@ -704,6 +741,12 @@ async def get_results(
             except (json.JSONDecodeError, TypeError):
                 a["app_html"] = ""
         a.pop("question_data", None)
+        # Only show solutions if teacher enabled immediate results
+        if not show_results:
+            a.pop("solution", None)
+            a.pop("feedback", None)
+            a.pop("points_awarded", None)
+            a.pop("is_correct", None)
         answers.append(a)
 
     from services.grading import calculate_grade, parse_scale
@@ -734,8 +777,10 @@ async def get_results(
 
 @router.post("/learning-material/{session_id}")
 async def generate_learning_material(
-    session_id: int, db: aiosqlite.Connection = Depends(get_db)
+    session_id: int, db: aiosqlite.Connection = Depends(get_db),
+    x_session_token: Optional[str] = Header(None),
 ):
+    _check_session_token(session_id, x_session_token)
     """Generate personalized learning material based on a student's weak areas."""
     # Get session + exam info
     cursor = await db.execute(
@@ -848,7 +893,8 @@ Erstelle jetzt das personalisierte Lernmaterial."""
 
 
 @router.post("/heartbeat")
-async def heartbeat(req: HeartbeatRequest, db: aiosqlite.Connection = Depends(get_db)):
+async def heartbeat(req: HeartbeatRequest, db: aiosqlite.Connection = Depends(get_db), x_session_token: Optional[str] = Header(None)):
+    _check_session_token(req.session_id, x_session_token)
     """Track which task a student is currently on (for live dashboard)."""
     cursor = await db.execute(
         "SELECT exam_id, student_id, status FROM exam_sessions WHERE id = ?", (req.session_id,)
@@ -878,7 +924,7 @@ def get_student_activity():
 
 
 @router.post("/explain")
-async def explain_task(req: ExplainRequest, db: aiosqlite.Connection = Depends(get_db)):
+async def explain_task(req: ExplainRequest, db: aiosqlite.Connection = Depends(get_db), x_session_token: Optional[str] = Header(None)):
     """AI tutor: explain a task to the student after exam submission."""
     cursor = await db.execute(
         """SELECT a.*, t.text as task_text, t.solution, t.task_type, t.points as max_points
@@ -890,6 +936,7 @@ async def explain_task(req: ExplainRequest, db: aiosqlite.Connection = Depends(g
     if not row:
         raise HTTPException(status_code=404, detail="Antwort nicht gefunden")
     answer = dict(row)
+    _check_session_token(answer["session_id"], x_session_token)
 
     # Verify session is submitted
     cursor = await db.execute(

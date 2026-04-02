@@ -14,7 +14,7 @@ function getMermaid() {
       const script = document.createElement("script");
       script.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
       script.onload = () => {
-        window.mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
+        window.mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });
         resolve(window.mermaid);
       };
       script.onerror = reject;

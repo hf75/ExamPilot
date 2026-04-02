@@ -1,7 +1,9 @@
 import bcrypt
 import jwt
 import datetime
-from fastapi import APIRouter, Depends, HTTPException
+import time
+from collections import defaultdict
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import aiosqlite
 
@@ -11,6 +13,21 @@ from models import LoginRequest, SetupPasswordRequest, TokenResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 security = HTTPBearer()
+
+# Simple rate limiter: {ip: [timestamps]}
+_rate_limits: dict[str, list[float]] = defaultdict(list)
+MAX_ATTEMPTS = 10  # per window
+RATE_WINDOW = 300  # 5 minutes
+
+
+def _check_rate_limit(request: Request):
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    # Clean old entries
+    _rate_limits[ip] = [t for t in _rate_limits[ip] if now - t < RATE_WINDOW]
+    if len(_rate_limits[ip]) >= MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Zu viele Versuche. Bitte 5 Minuten warten.")
+    _rate_limits[ip].append(now)
 
 
 def hash_password(password: str) -> str:
@@ -42,7 +59,9 @@ def verify_token(token: str) -> dict:
 async def require_teacher(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    verify_token(credentials.credentials)
+    payload = verify_token(credentials.credentials)
+    if payload.get("role") != "teacher":
+        raise HTTPException(status_code=403, detail="Keine Lehrerrechte")
     return True
 
 
@@ -77,7 +96,8 @@ async def setup_password(
 
 
 @router.post("/login")
-async def login(req: LoginRequest, db: aiosqlite.Connection = Depends(get_db)):
+async def login(req: LoginRequest, request: Request, db: aiosqlite.Connection = Depends(get_db)):
+    _check_rate_limit(request)
     cursor = await db.execute(
         "SELECT value FROM settings WHERE key = ?", (TEACHER_PASSWORD_HASH_KEY,)
     )
