@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import InlineMarkdown from "./InlineMarkdown";
 
 export default function Matching({ task, questionData, answer, onChange, disabled }) {
   const pairs = questionData.pairs || [];
+  const userInteracted = useRef(false);
 
   const [selections, setSelections] = useState(() => {
     try {
@@ -39,11 +40,13 @@ export default function Matching({ task, questionData, answer, onChange, disable
   }, [answer]);
 
   useEffect(() => {
+    if (!userInteracted.current) return;
     onChange(JSON.stringify(selections));
   }, [selections]);
 
   function handleSelect(questionIdx, value) {
     if (disabled) return;
+    userInteracted.current = true;
     setSelections((prev) => ({ ...prev, [questionIdx]: value }));
   }
 

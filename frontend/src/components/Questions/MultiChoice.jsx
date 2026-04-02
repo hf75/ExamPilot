@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import InlineMarkdown from "./InlineMarkdown";
 
 export default function MultiChoice({ task, questionData, answer, onChange, disabled }) {
   const single = questionData.single !== false;
   const answers = questionData.answers || [];
+  const userInteracted = useRef(false);
 
   // Parse existing answer
   const [selected, setSelected] = useState(() => {
@@ -39,11 +40,13 @@ export default function MultiChoice({ task, questionData, answer, onChange, disa
   }, [answer]);
 
   useEffect(() => {
+    if (!userInteracted.current) return;
     onChange(JSON.stringify(selected));
   }, [selected]);
 
   function handleChange(idx) {
     if (disabled) return;
+    userInteracted.current = true;
     if (single) {
       setSelected([idx]);
     } else {

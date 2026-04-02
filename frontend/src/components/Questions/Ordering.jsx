@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import InlineMarkdown from "./InlineMarkdown";
 
 export default function Ordering({ task, questionData, answer, onChange, disabled }) {
   const items = questionData.items || [];
   const horizontal = questionData.horizontal || false;
+  const userInteracted = useRef(false);
 
   // Initialize with shuffled order
   const [order, setOrder] = useState(() => {
@@ -32,11 +33,13 @@ export default function Ordering({ task, questionData, answer, onChange, disable
   }, [answer]);
 
   useEffect(() => {
+    if (!userInteracted.current) return;
     onChange(JSON.stringify(order));
   }, [order]);
 
   function moveUp(idx) {
     if (disabled || idx === 0) return;
+    userInteracted.current = true;
     setOrder((prev) => {
       const next = [...prev];
       [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
@@ -46,6 +49,7 @@ export default function Ordering({ task, questionData, answer, onChange, disable
 
   function moveDown(idx) {
     if (disabled || idx === order.length - 1) return;
+    userInteracted.current = true;
     setOrder((prev) => {
       const next = [...prev];
       [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
@@ -63,6 +67,7 @@ export default function Ordering({ task, questionData, answer, onChange, disable
   function handleDragOver(e, idx) {
     e.preventDefault();
     if (dragIdx === null || dragIdx === idx) return;
+    userInteracted.current = true;
     setOrder((prev) => {
       const next = [...prev];
       const item = next.splice(dragIdx, 1)[0];

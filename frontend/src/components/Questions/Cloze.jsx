@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import InlineMarkdown from "./InlineMarkdown";
 
 export default function Cloze({ task, questionData, answer, onChange, disabled }) {
   const gaps = questionData.gaps || [];
+  const userInteracted = useRef(false);
 
   const [gapAnswers, setGapAnswers] = useState(() => {
     try {
@@ -23,11 +24,13 @@ export default function Cloze({ task, questionData, answer, onChange, disabled }
   }, [answer]);
 
   useEffect(() => {
+    if (!userInteracted.current) return;
     onChange(JSON.stringify(gapAnswers));
   }, [gapAnswers]);
 
   function handleGapChange(idx, value) {
     if (disabled) return;
+    userInteracted.current = true;
     setGapAnswers((prev) => {
       const next = [...prev];
       next[idx] = value;
