@@ -191,7 +191,7 @@ WICHTIG: Jede Aufgabe MUSS eine ausführliche "solution" (Musterlösung) enthalt
 
 SYSTEM_PROMPT = """Du bist ein erfahrener Lehrer. Analysiere das hochgeladene Dokument und erstelle daraus strukturierte Prüfungsaufgaben in verschiedenen Formaten.
 Antworte IMMER als valides JSON-Array. Keine zusätzliche Erklärung.
-WICHTIG: Achte auf korrektes JSON-Escaping! Anführungszeichen innerhalb von String-Werten MÜSSEN escaped werden (\\"). Verwende keine unescapten " innerhalb von JSON-Strings."""
+WICHTIG: Achte auf korrektes JSON-Escaping! Verwende NIEMALS Anführungszeichen ("...") zum Hervorheben von Text innerhalb von JSON-Strings — nutze stattdessen **fett** oder *kursiv* mit Markdown. Anführungszeichen innerhalb von JSON-Strings brechen das JSON-Format."""
 
 
 async def _post_process_tasks(tasks: list, image_map: dict[str, str] | None = None) -> None:

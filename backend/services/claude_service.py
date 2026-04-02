@@ -496,7 +496,7 @@ async def generate_tasks(topic: str, count: int, difficulty: str, instructions: 
     system_prompt = """Du bist ein erfahrener Lehrer an einer Berufsschule.
 Erstelle praxisnahe Prüfungsaufgaben in verschiedenen Fragetypen.
 Antworte IMMER als valides JSON-Array.
-WICHTIG: Achte auf korrektes JSON-Escaping! Anführungszeichen innerhalb von String-Werten MÜSSEN escaped werden (\\"). Verwende keine unescapten " innerhalb von JSON-Strings."""
+WICHTIG: Verwende NIEMALS Anführungszeichen ("...") zum Hervorheben von Text in JSON-Strings — nutze stattdessen **fett** oder *kursiv* mit Markdown. Anführungszeichen brechen das JSON-Format."""
 
     user_message = f"""Generiere {count} Prüfungsaufgaben zum Thema "{topic}".
 Schwierigkeitsgrad: {difficulty}
@@ -564,7 +564,7 @@ async def ai_edit_task(
 
     system_prompt = """Du bist ein erfahrener Lehrer. Passe die gegebene Prüfungsaufgabe
 nach der Anweisung des Lehrers an. Antworte IMMER als valides JSON.
-WICHTIG: Achte auf korrektes JSON-Escaping! Anführungszeichen innerhalb von String-Werten MÜSSEN escaped werden (\\").
+WICHTIG: Verwende NIEMALS Anführungszeichen ("...") zum Hervorheben in JSON-Strings — nutze **fett** oder *kursiv*.
 
 Gültige Aufgabentypen: multichoice, truefalse, shortanswer, numerical, matching, essay, ordering, cloze, description, webapp, feynman, scenario
 
@@ -732,7 +732,7 @@ WICHTIG: Antworte IMMER als valides JSON:
   "options": ["Option A", "Option B", "Option C"]
 }}{last_decision_instruction}
 
-Achte auf korrektes JSON-Escaping! Anführungszeichen in Strings MÜSSEN escaped werden."""
+Verwende NIEMALS Anführungszeichen ("...") in JSON-Strings — nutze **fett** oder *kursiv* zum Hervorheben."""
 
     # Build conversation from transcript
     claude_messages = []
