@@ -74,14 +74,28 @@ export default function ExamBuilder() {
   }
 
   async function handleDelete(id) {
-    if (!confirm("Klassenarbeit wirklich löschen?")) return;
-    await api.delete(`/api/exams/${id}`);
-    loadExams();
+    if (!confirm("Klassenarbeit wirklich löschen? Alle Ergebnisse gehen verloren.")) return;
+    try {
+      await api.delete(`/api/exams/${id}`);
+      loadExams();
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   async function handleStatusChange(id, status) {
-    await api.put(`/api/exams/${id}`, { status });
-    loadExams();
+    const messages = {
+      active: "Klassenarbeit aktivieren? Schüler können dann sofort beitreten.",
+      closed: "Klassenarbeit schließen? Schüler können dann nicht mehr antworten.",
+      draft: "Klassenarbeit zurück auf Entwurf setzen?",
+    };
+    if (!confirm(messages[status] || "Status ändern?")) return;
+    try {
+      await api.put(`/api/exams/${id}`, { status });
+      loadExams();
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   if (editing) {
@@ -790,31 +804,51 @@ function ExamDetail({ exam, onBack }) {
   }, [selectedPoolId]);
 
   async function loadExamTasks() {
-    const data = await api.get(`/api/exams/${exam.id}/tasks`);
-    setExamTasks(data);
+    try {
+      const data = await api.get(`/api/exams/${exam.id}/tasks`);
+      setExamTasks(data);
+    } catch (err) {
+      toast.error("Aufgaben konnten nicht geladen werden");
+    }
   }
 
   async function loadPools() {
-    const data = await api.get("/api/pools");
-    setPools(data);
-    if (data.length > 0) {
-      setSelectedPoolId(data[0].id);
+    try {
+      const data = await api.get("/api/pools");
+      setPools(data);
+      if (data.length > 0) {
+        setSelectedPoolId(data[0].id);
+      }
+    } catch (err) {
+      toast.error("Pools konnten nicht geladen werden");
     }
   }
 
   async function loadPoolTasks() {
-    const data = await api.get(`/api/tasks?pool_id=${selectedPoolId}`);
-    setPoolTasks(data);
+    try {
+      const data = await api.get(`/api/tasks?pool_id=${selectedPoolId}`);
+      setPoolTasks(data);
+    } catch (err) {
+      toast.error("Pool-Aufgaben konnten nicht geladen werden");
+    }
   }
 
   async function addTask(taskId) {
-    await api.post(`/api/exams/${exam.id}/tasks`, { task_id: taskId });
-    loadExamTasks();
+    try {
+      await api.post(`/api/exams/${exam.id}/tasks`, { task_id: taskId });
+      loadExamTasks();
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   async function removeTask(taskId) {
-    await api.delete(`/api/exams/${exam.id}/tasks/${taskId}`);
-    loadExamTasks();
+    try {
+      await api.delete(`/api/exams/${exam.id}/tasks/${taskId}`);
+      loadExamTasks();
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   const examTaskIds = new Set(examTasks.map((t) => t.id));

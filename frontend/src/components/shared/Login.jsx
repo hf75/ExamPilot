@@ -14,6 +14,9 @@ export default function Login() {
     api.get("/api/auth/status").then((data) => {
       setIsSetup(!data.password_set);
       setLoading(false);
+    }).catch(() => {
+      setError("Server nicht erreichbar. Bitte prüfe ob ExamPilot gestartet ist.");
+      setLoading(false);
     });
   }, []);
 

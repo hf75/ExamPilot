@@ -12,6 +12,19 @@ from models import TaskCreate, TaskUpdate, TaskOut
 from routers.auth import require_teacher
 from services.claude_service import generate_tasks as ai_generate_tasks, ai_edit_task, generate_webapp
 
+MAX_UPLOAD_SIZE = 20 * 1024 * 1024  # 20 MB
+
+
+async def _check_file_size(file: UploadFile, max_size: int = MAX_UPLOAD_SIZE):
+    """Read file content and enforce size limit."""
+    content = await file.read()
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Datei zu groß ({len(content) // 1024 // 1024} MB). Maximum: {max_size // 1024 // 1024} MB."
+        )
+    return content
+
 
 class GenerateRequest(BaseModel):
     topic: str
@@ -203,9 +216,10 @@ async def import_document_endpoint(
 
     types_list = [t.strip() for t in allowed_types.split(",") if t.strip()] if allowed_types.strip() else None
 
+    content = await _check_file_size(file)
+
     suffix = f".{ext}"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 
@@ -313,8 +327,8 @@ async def import_moodle_xml_endpoint(
     from services.moodle_xml import parse_moodle_xml
 
     try:
-        content = await file.read()
-        xml_str = content.decode("utf-8")
+        content = await _check_file_size(file)
+        xml_str = content.decode("utf-8", errors="replace")
         tasks = parse_moodle_xml(xml_str)
         return {"tasks": tasks}
     except Exception as e:

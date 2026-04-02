@@ -68,10 +68,12 @@ async def create_duel_from_document(
     if ext not in ("pdf", "docx"):
         raise HTTPException(status_code=400, detail="Nur PDF- und DOCX-Dateien werden unterstützt")
 
-    # Save to temp file
+    # Save to temp file (max 20 MB)
+    content = await file.read()
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Datei zu groß. Maximum: 20 MB.")
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
     try:
-        content = await file.read()
         tmp.write(content)
         tmp.close()
 

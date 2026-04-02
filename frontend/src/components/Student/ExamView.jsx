@@ -89,8 +89,9 @@ export default function ExamView() {
   }
 
   // Auto-save answer (debounced) — saves only, no grading during exam
+  const retryQueue = useRef({});
   const autoSave = useCallback(
-    async (taskId, answer) => {
+    async (taskId, answer, retryCount = 0) => {
       try {
         await api.post("/api/student/answer", {
           session_id: parseInt(sessionId),
@@ -98,9 +99,21 @@ export default function ExamView() {
           student_answer: answer,
         });
         setSaveStatus("");
+        delete retryQueue.current[taskId];
       } catch {
-        setSaveStatus("error");
-        toast.error("Antwort konnte nicht gespeichert werden");
+        if (retryCount < 3) {
+          // Retry with exponential backoff
+          const delay = (retryCount + 1) * 2000;
+          retryQueue.current[taskId] = setTimeout(
+            () => autoSave(taskId, answer, retryCount + 1),
+            delay
+          );
+          setSaveStatus("retrying");
+        } else {
+          setSaveStatus("error");
+          toast.error("Antwort konnte nicht gespeichert werden. Bitte Internetverbindung prüfen.");
+          delete retryQueue.current[taskId];
+        }
       }
     },
     [sessionId]

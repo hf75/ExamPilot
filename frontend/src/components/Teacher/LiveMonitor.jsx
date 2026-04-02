@@ -7,6 +7,7 @@ export default function LiveMonitor() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [wsConnected, setWsConnected] = useState(false);
   const ws = useRef(null);
   const reconnectDelay = useRef(1000);
   const unmounted = useRef(false);
@@ -43,12 +44,14 @@ export default function LiveMonitor() {
     ws.current = new WebSocket(url);
     ws.current.onopen = () => {
       reconnectDelay.current = 1000;
+      setWsConnected(true);
     };
     ws.current.onmessage = () => {
       loadProgress();
     };
     ws.current.onerror = () => {};
     ws.current.onclose = () => {
+      setWsConnected(false);
       if (unmounted.current) return;
       const delay = Math.min(reconnectDelay.current, 30000);
       reconnectDelay.current = delay * 2;
@@ -58,7 +61,9 @@ export default function LiveMonitor() {
 
   function getStuckMinutes(lastSeen) {
     if (!lastSeen) return 0;
-    const diff = Date.now() - new Date(lastSeen + "Z").getTime();
+    const date = new Date(lastSeen + "Z");
+    if (isNaN(date.getTime())) return 0;
+    const diff = Date.now() - date.getTime();
     return Math.floor(diff / 60000);
   }
 
@@ -77,6 +82,16 @@ export default function LiveMonitor() {
 
       <div className="monitor-header">
         <h2>Live-Dashboard</h2>
+        {!wsConnected && (
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            background: "#fef2f2", color: "#b91c1c", padding: "4px 12px",
+            borderRadius: 6, fontSize: 13, fontWeight: 500,
+          }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#b91c1c", display: "inline-block" }} />
+            Verbindung unterbrochen — Daten werden per Polling aktualisiert
+          </span>
+        )}
         <div className="monitor-stats">
           <span className="monitor-stat">
             <strong>{students.length}</strong> Teilnehmer
