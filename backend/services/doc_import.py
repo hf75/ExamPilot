@@ -169,26 +169,35 @@ async def _post_process_tasks(tasks: list, image_map: dict[str, str] | None = No
                 if img_id in image_map:
                     data_url = image_map[img_id]
                     img_md = f"\n\n![{img_id}]({data_url})\n\n"
-                    # Try both double-brace {{img_1}} and single-brace {img_1} placeholders
-                    # Claude may use either format depending on context
-                    double_ph = "{{" + img_id + "}}"
-                    single_ph = "{" + img_id + "}"
-                    replaced = False
                     for field in ("text", "solution"):
                         val = task.get(field, "")
-                        if double_ph in val:
-                            task[field] = val.replace(double_ph, img_md)
-                            replaced = True
-                        elif single_ph in val:
-                            task[field] = val.replace(single_ph, img_md)
-                            replaced = True
-                    if not replaced:
-                        # No placeholder found — append image at end of text
-                        task["text"] += img_md
-        # Clean up any unreferenced image placeholders (both formats)
-        task["text"] = re.sub(r'\{\{?img_\d+\}\}?', '', task["text"])
+                        if not val:
+                            continue
+                        # Replace all known placeholder formats Claude might use:
+                        # {{img_1}}, {img_1}, ![img_1](), ![img_1](img_1), ![img_1]
+                        new_val = val
+                        new_val = new_val.replace("{{" + img_id + "}}", img_md)
+                        new_val = new_val.replace("{" + img_id + "}", img_md)
+                        # Markdown image with empty or self-referencing URL
+                        new_val = re.sub(
+                            r'!\[' + re.escape(img_id) + r'\]\([^)]*\)',
+                            img_md, new_val
+                        )
+                        # Markdown image reference without URL: ![img_1]
+                        new_val = re.sub(
+                            r'!\[' + re.escape(img_id) + r'\](?!\()',
+                            img_md, new_val
+                        )
+                        if new_val != val:
+                            task[field] = new_val
+                    # If no placeholder was found anywhere, append at end
+                    if img_id not in task.get("text", ""):
+                        task["text"] = task.get("text", "") + img_md
+        # Clean up any unreferenced image placeholders (all formats)
+        _img_cleanup = r'\{\{?img_\d+\}\}?|!\[img_\d+\]\([^)]*\)|!\[img_\d+\](?!\()'
+        task["text"] = re.sub(_img_cleanup, '', task["text"])
         if task.get("solution"):
-            task["solution"] = re.sub(r'\{\{?img_\d+\}\}?', '', task["solution"])
+            task["solution"] = re.sub(_img_cleanup, '', task["solution"])
 
         # Generate app_html for webapp tasks
         if task["task_type"] == "webapp":
