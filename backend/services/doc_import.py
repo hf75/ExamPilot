@@ -16,6 +16,49 @@ from config import CLAUDE_MODEL
 logger = logging.getLogger("uvicorn.error")
 
 
+def _repair_unescaped_quotes(text: str) -> str:
+    """Fix unescaped double quotes inside JSON string values.
+    Claude sometimes writes German quotes like „text"  where the closing "
+    is an unescaped ASCII double quote that breaks JSON parsing."""
+    result = []
+    i = 0
+    in_string = False
+    while i < len(text):
+        ch = text[i]
+        if ch == '\\' and in_string:
+            # Escaped character — skip both
+            result.append(ch)
+            if i + 1 < len(text):
+                i += 1
+                result.append(text[i])
+            i += 1
+            continue
+        if ch == '"':
+            if not in_string:
+                in_string = True
+                result.append(ch)
+            else:
+                # Check if this quote is a real string terminator:
+                # look ahead for JSON structural chars after optional whitespace
+                rest = text[i + 1:].lstrip()
+                if rest and rest[0] in (',', '}', ']', ':'):
+                    # Structural close — real end of string
+                    in_string = False
+                    result.append(ch)
+                elif not rest:
+                    # End of text
+                    in_string = False
+                    result.append(ch)
+                else:
+                    # Mid-string quote — escape it
+                    result.append('\\"')
+            i += 1
+            continue
+        result.append(ch)
+        i += 1
+    return "".join(result)
+
+
 def _parse_json_response(text: str) -> list:
     """Extract JSON array from Claude's response, with repair for common issues."""
     text = text.strip()
@@ -30,19 +73,20 @@ def _parse_json_response(text: str) -> list:
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        logger.warning("JSON parse attempt 1 failed: %s (pos %d, around: ...%s...)",
-                       e.msg, e.pos, text[max(0,e.pos-50):e.pos+50])
+        logger.warning("JSON parse attempt 1 failed: %s (pos %d)", e.msg, e.pos)
 
-    # Repair attempt: fix common Claude JSON issues
-    repaired = text
+    # Repair attempt 1: fix unescaped quotes inside strings (common with German „...")
+    repaired = _repair_unescaped_quotes(text)
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
 
-    # Fix truncated output: close open brackets/braces
+    # Repair attempt 2: fix truncated output — close open brackets/braces
     if repaired.count("[") > repaired.count("]"):
-        # Find last complete object (ending with })
         last_brace = repaired.rfind("}")
         if last_brace != -1:
             repaired = repaired[: last_brace + 1]
-            # Remove trailing comma if present
             repaired = repaired.rstrip().rstrip(",")
             repaired += "]"
 
