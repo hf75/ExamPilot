@@ -1,10 +1,13 @@
 import json
+import logging
 import os
 import tempfile
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import Optional, List
 import aiosqlite
 from pydantic import BaseModel
+
+logger = logging.getLogger("uvicorn.error")
 
 from database import get_db
 from models import ExamCreate, ExamUpdate, ExamOut
@@ -428,6 +431,7 @@ async def generate_adhoc_exam(
                 task["source"] = f.filename
             all_tasks.extend(tasks)
         except Exception as e:
+            logger.error("Ad-hoc import failed for %s: %s", f.filename, e, exc_info=True)
             errors.append({"file": f.filename, "error": str(e)})
         finally:
             os.unlink(tmp_path)
