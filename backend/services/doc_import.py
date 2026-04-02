@@ -8,26 +8,9 @@ No external tools (LibreOffice, pandoc) required.
 import json
 import re
 import base64
-import asyncio
 import io
 
-from anthropic import Anthropic
-from config import CLAUDE_MODEL, get_active_api_key
-
-# Rate limiting
-_semaphore = asyncio.Semaphore(2)
-
-_client = None
-_client_key = None
-
-
-def _get_client():
-    global _client, _client_key
-    key = get_active_api_key()
-    if _client is None or key != _client_key:
-        _client = Anthropic(api_key=key)
-        _client_key = key
-    return _client
+from config import CLAUDE_MODEL
 
 
 def _parse_json_response(text: str) -> list:
@@ -180,23 +163,32 @@ async def _post_process_tasks(tasks: list, image_map: dict[str, str] | None = No
         task.setdefault("question_data", {})
 
         # Embed referenced images into task text as Markdown images
-        if image_map:
-            referenced_images = task.pop("images", []) or []
+        referenced_images = task.pop("images", []) or []
+        if image_map and referenced_images:
             for img_id in referenced_images:
                 if img_id in image_map:
                     data_url = image_map[img_id]
-                    placeholder = "{{" + img_id + "}}"
                     img_md = f"\n\n![{img_id}]({data_url})\n\n"
-                    if placeholder in task["text"]:
-                        task["text"] = task["text"].replace(placeholder, img_md)
-                    else:
+                    # Try both double-brace {{img_1}} and single-brace {img_1} placeholders
+                    # Claude may use either format depending on context
+                    double_ph = "{{" + img_id + "}}"
+                    single_ph = "{" + img_id + "}"
+                    replaced = False
+                    for field in ("text", "solution"):
+                        val = task.get(field, "")
+                        if double_ph in val:
+                            task[field] = val.replace(double_ph, img_md)
+                            replaced = True
+                        elif single_ph in val:
+                            task[field] = val.replace(single_ph, img_md)
+                            replaced = True
+                    if not replaced:
                         # No placeholder found — append image at end of text
                         task["text"] += img_md
-                    # Also replace in solution if referenced
-                    if placeholder in task.get("solution", ""):
-                        task["solution"] = task["solution"].replace(placeholder, img_md)
-            # Clean up any unreferenced placeholders
-            task["text"] = re.sub(r'\{\{img_\d+\}\}', '', task["text"])
+        # Clean up any unreferenced image placeholders (both formats)
+        task["text"] = re.sub(r'\{\{?img_\d+\}\}?', '', task["text"])
+        if task.get("solution"):
+            task["solution"] = re.sub(r'\{\{?img_\d+\}\}?', '', task["solution"])
 
         # Generate app_html for webapp tasks
         if task["task_type"] == "webapp":
@@ -365,16 +357,9 @@ async def import_document(file_path: str, original_filename: str, allowed_types:
     # Append task generation prompt
     content.append({"type": "text", "text": _build_task_prompt(allowed_types, coding_language)})
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            _get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=64000,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": content}],
-        )
-
-    tasks = _parse_json_response(response.content[0].text)
+    from services.claude_service import _call_claude
+    text = await _call_claude(SYSTEM_PROMPT, [{"role": "user", "content": content}], max_tokens=64000)
+    tasks = _parse_json_response(text)
 
     # Validate, embed images, and post-process
     await _post_process_tasks(tasks, image_map)
@@ -411,16 +396,9 @@ async def import_document_with_instructions(
 
     content.append({"type": "text", "text": custom_prompt})
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            _get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=64000,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": content}],
-        )
-
-    tasks = _parse_json_response(response.content[0].text)
+    from services.claude_service import _call_claude
+    text = await _call_claude(SYSTEM_PROMPT, [{"role": "user", "content": content}], max_tokens=64000)
+    tasks = _parse_json_response(text)
 
     # Validate, embed images, and post-process
     await _post_process_tasks(tasks, image_map)
