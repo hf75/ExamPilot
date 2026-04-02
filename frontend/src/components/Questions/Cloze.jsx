@@ -38,9 +38,13 @@ export default function Cloze({ task, questionData, answer, onChange, disabled }
     });
   }
 
-  // Split text by gap markers [[1]], [[2]], or **[1]** (bold-wrapped)
+  // Normalize all gap marker formats to [[n]]:
+  // **[1]** (bold-wrapped), {{1}} (double braces), {1} (single braces in non-ambiguous context)
   // Do NOT match bare [1] — that could be normal text like "Artikel [1]"
-  const text = (task.text || "").replace(/\*\*\[(\d+)\]\*\*/g, "[[$1]]");
+  const text = (task.text || "")
+    .replace(/\*\*\[(\d+)\]\*\*/g, "[[$1]]")
+    .replace(/\*\*\{\{(\d+)\}\}\*\*/g, "[[$1]]")
+    .replace(/\{\{(\d+)\}\}/g, "[[$1]]");
   const parts = text.split(/\[\[(\d+)\]\]/);
 
   return (
