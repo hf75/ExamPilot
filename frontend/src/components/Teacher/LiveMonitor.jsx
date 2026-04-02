@@ -39,11 +39,13 @@ export default function LiveMonitor() {
     if (unmounted.current) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
-    const token = localStorage.getItem("teacher_token") || "";
-    const url = `${protocol}//${host}/ws/exam/${examId}?token=${token}`;
+    const url = `${protocol}//${host}/ws/exam/${examId}`;
 
     ws.current = new WebSocket(url);
     ws.current.onopen = () => {
+      // Authenticate with first message (token not in URL)
+      const token = localStorage.getItem("teacher_token") || "";
+      ws.current.send(JSON.stringify({ token }));
       reconnectDelay.current = 1000;
       setWsConnected(true);
     };

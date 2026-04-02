@@ -1,8 +1,10 @@
+import hmac
 import json
 import asyncio
 import logging
 import random
 import secrets
+import time
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from typing import Optional
 import aiosqlite
@@ -22,17 +24,48 @@ router = APIRouter(prefix="/api/student", tags=["student"])
 # In-memory tracking for live dashboard: {session_id: {"task_id": int, "last_seen": str}}
 _student_activity: dict[int, dict] = {}
 
-# Session tokens: {session_id: token} — validates student owns the session
-_session_tokens: dict[int, str] = {}
+# Session tokens: {session_id: (token, created_at)} — validates student owns the session
+_session_tokens: dict[int, tuple[str, float]] = {}
+
+SESSION_TOKEN_MAX_AGE = 24 * 3600  # 24 hours
+_MAX_SESSIONS = 10000
+_MAX_ACTIVITY = 5000
+
+
+def _cleanup_expired_tokens():
+    """Remove expired session tokens and cap size."""
+    now = time.time()
+    expired = [sid for sid, (_, created) in _session_tokens.items()
+               if now - created > SESSION_TOKEN_MAX_AGE]
+    for sid in expired:
+        _session_tokens.pop(sid, None)
+        _student_activity.pop(sid, None)
+    # Hard cap: remove oldest if too many
+    if len(_session_tokens) > _MAX_SESSIONS:
+        sorted_by_age = sorted(_session_tokens.items(), key=lambda x: x[1][1])
+        for sid, _ in sorted_by_age[:len(_session_tokens) - _MAX_SESSIONS]:
+            _session_tokens.pop(sid, None)
+            _student_activity.pop(sid, None)
+    # Cap activity dict too
+    if len(_student_activity) > _MAX_ACTIVITY:
+        oldest = sorted(_student_activity.items(), key=lambda x: x[1].get("last_seen", ""))
+        for sid, _ in oldest[:len(_student_activity) - _MAX_ACTIVITY]:
+            _student_activity.pop(sid, None)
 
 
 def _check_session_token(session_id: int, token: Optional[str]):
     """Verify the caller owns this specific session_id."""
     if not token:
         raise HTTPException(status_code=401, detail="Session-Token fehlt")
-    expected = _session_tokens.get(session_id)
-    if not expected or expected != token:
+    entry = _session_tokens.get(session_id)
+    if not entry:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    expected_token, created_at = entry
+    if expected_token != token:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    if time.time() - created_at > SESSION_TOKEN_MAX_AGE:
+        _session_tokens.pop(session_id, None)
+        raise HTTPException(status_code=401, detail="Session abgelaufen")
 
 
 @router.get("/exams")
@@ -63,8 +96,8 @@ async def join_exam(
     if not exam:
         raise HTTPException(status_code=404, detail="Keine aktive Klassenarbeit mit dieser ID gefunden")
 
-    # Check password if exam has one
-    if exam["password"] and exam["password"] != (req.password or ""):
+    # Check password if exam has one (constant-time comparison to prevent timing attacks)
+    if exam["password"] and not hmac.compare_digest(exam["password"], req.password or ""):
         raise HTTPException(status_code=403, detail="Falsches Passwort")
 
     # Find or create student
@@ -88,8 +121,10 @@ async def join_exam(
     existing = await cursor.fetchone()
     if existing:
         await db.commit()
-        token = _session_tokens.get(existing[0]) or secrets.token_urlsafe(32)
-        _session_tokens[existing[0]] = token
+        _cleanup_expired_tokens()
+        entry = _session_tokens.get(existing[0])
+        token = entry[0] if entry else secrets.token_urlsafe(32)
+        _session_tokens[existing[0]] = (token, time.time())
         return {"session_id": existing[0], "session_token": token, "message": "Bestehende Sitzung fortgesetzt"}
 
     # Create new session
@@ -99,8 +134,9 @@ async def join_exam(
     )
     session_id = cursor.lastrowid
     await db.commit()
+    _cleanup_expired_tokens()
     token = secrets.token_urlsafe(32)
-    _session_tokens[session_id] = token
+    _session_tokens[session_id] = (token, time.time())
     await broadcast(req.exam_id, "student_joined", {"student_name": req.name, "session_id": session_id})
     return {"session_id": session_id, "session_token": token, "message": "Erfolgreich angemeldet"}
 

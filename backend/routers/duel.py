@@ -106,7 +106,7 @@ async def create_duel_from_document(
 
 
 @router.get("/room/{room_code}")
-async def get_room_info(room_code: str):
+async def get_room_info(room_code: str, _: bool = Depends(require_teacher)):
     room = get_room(room_code)
     if not room:
         raise HTTPException(status_code=404, detail="Raum nicht gefunden")

@@ -18,16 +18,22 @@ security = HTTPBearer()
 _rate_limits: dict[str, list[float]] = defaultdict(list)
 MAX_ATTEMPTS = 10  # per window
 RATE_WINDOW = 300  # 5 minutes
+_MAX_RATE_IPS = 5000
 
 
 def _check_rate_limit(request: Request):
     ip = request.client.host if request.client else "unknown"
     now = time.time()
-    # Clean old entries
+    # Clean old entries for this IP
     _rate_limits[ip] = [t for t in _rate_limits[ip] if now - t < RATE_WINDOW]
     if len(_rate_limits[ip]) >= MAX_ATTEMPTS:
         raise HTTPException(status_code=429, detail="Zu viele Versuche. Bitte 5 Minuten warten.")
     _rate_limits[ip].append(now)
+    # Periodic cleanup: remove stale IPs to prevent memory growth
+    if len(_rate_limits) > _MAX_RATE_IPS:
+        stale = [k for k, v in _rate_limits.items() if not v or now - max(v) > RATE_WINDOW]
+        for k in stale:
+            del _rate_limits[k]
 
 
 def hash_password(password: str) -> str:
