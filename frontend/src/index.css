@@ -955,6 +955,10 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* Break out of the 1200px dashboard-content container */
+  width: calc(100vw - 48px);
+  max-width: 1800px;
+  margin-left: calc(-1 * (min(100vw - 48px, 1800px) - 100%) / 2);
 }
 
 .exam-detail-topbar {
