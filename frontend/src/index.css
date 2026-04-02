@@ -4896,6 +4896,20 @@ a:hover {
   font-family: monospace;
 }
 
+/* Tunnel Settings */
+.settings-tunnel-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.settings-tunnel-url {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--accent);
+  word-break: break-all;
+}
+
 /* LTI Settings */
 .lti-platform-list {
   display: flex;

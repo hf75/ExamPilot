@@ -48,6 +48,9 @@ export default function Settings() {
       }
       setApiKeyMasked(data.api_key_masked || "");
       setApiKeySet(data.api_key_set || false);
+      setTunnelEnabled(data.tunnel_enabled || false);
+      setTunnelUrl(data.tunnel_url || null);
+      setTunnelInstalled(data.tunnel_installed || false);
     } catch (err) {
       toast.error("Einstellungen konnten nicht geladen werden");
     } finally {
@@ -124,6 +127,12 @@ export default function Settings() {
       setSavingKey(false);
     }
   }
+
+  // Tunnel state
+  const [tunnelEnabled, setTunnelEnabled] = useState(false);
+  const [tunnelUrl, setTunnelUrl] = useState(null);
+  const [tunnelInstalled, setTunnelInstalled] = useState(false);
+  const [savingTunnel, setSavingTunnel] = useState(false);
 
   // LTI state
   const [ltiPlatforms, setLtiPlatforms] = useState([]);
@@ -233,6 +242,60 @@ export default function Settings() {
               Abbrechen
             </button>
           </div>
+        )}
+      </div>
+
+      <div className="settings-section">
+        <h3>HTTPS-Tunnel (Cloudflare)</h3>
+        <p className="settings-description">
+          Aktiviert einen sicheren HTTPS-Tunnel über Cloudflare.
+          Schüler können sich dann über eine öffentliche URL verbinden — ohne Portfreigabe
+          oder Netzwerkkonfiguration. Beim ersten Aktivieren wird cloudflared
+          automatisch heruntergeladen (~30 MB). Der Tunnel startet beim nächsten Server-Neustart.
+        </p>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+          <label className="checkbox-label" style={{ margin: 0 }}>
+            <input
+              type="checkbox"
+              checked={tunnelEnabled}
+              onChange={async (e) => {
+                const val = e.target.checked;
+                setSavingTunnel(true);
+                try {
+                  await api.put("/api/auth/settings", { tunnel_enabled: val ? "true" : "false" });
+                  setTunnelEnabled(val);
+                  toast.success(
+                    val
+                      ? "Tunnel aktiviert. Bitte Server neu starten."
+                      : "Tunnel deaktiviert. Bitte Server neu starten."
+                  );
+                } catch (err) {
+                  toast.error(err.message);
+                } finally {
+                  setSavingTunnel(false);
+                }
+              }}
+              disabled={savingTunnel}
+            />
+            HTTPS-Tunnel aktivieren
+          </label>
+        </div>
+
+        {tunnelUrl && (
+          <div className="settings-tunnel-status">
+            <span className="settings-api-badge active">Aktiv</span>
+            <a href={tunnelUrl} target="_blank" rel="noopener noreferrer" className="settings-tunnel-url">
+              {tunnelUrl}
+            </a>
+          </div>
+        )}
+        {tunnelEnabled && !tunnelUrl && (
+          <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+            {tunnelInstalled
+              ? "Tunnel ist aktiviert — wird beim nächsten Server-Neustart gestartet."
+              : "Tunnel ist aktiviert — cloudflared wird beim nächsten Server-Neustart heruntergeladen und gestartet."}
+          </p>
         )}
       </div>
 

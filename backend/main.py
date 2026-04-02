@@ -18,7 +18,21 @@ from routers import auth, tasks, exams, student, results, export, websocket, poo
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+
+    # Start Cloudflare Tunnel if enabled in settings
+    from services.tunnel_service import is_tunnel_enabled, start_tunnel, stop_tunnel, get_tunnel_url
+    tunnel_url = None
+    if is_tunnel_enabled():
+        tunnel_url = await start_tunnel(port=8000)
+        if tunnel_url:
+            print()
+            print(f"  HTTPS:    {tunnel_url}")
+            print(f"  (Cloudflare Tunnel aktiv)")
+
     yield
+
+    # Cleanup tunnel on shutdown
+    stop_tunnel()
 
 
 app = FastAPI(title="ExamPilot", version="1.0.0", lifespan=lifespan)

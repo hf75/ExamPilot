@@ -115,6 +115,12 @@ async def get_settings(
     else:
         result["api_key_masked"] = ""
         result["api_key_set"] = False
+
+    # Add tunnel info
+    from services.tunnel_service import get_tunnel_url, is_tunnel_enabled, is_cloudflared_installed
+    result["tunnel_enabled"] = is_tunnel_enabled()
+    result["tunnel_url"] = get_tunnel_url()
+    result["tunnel_installed"] = is_cloudflared_installed()
     return result
 
 
