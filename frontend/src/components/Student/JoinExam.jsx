@@ -50,7 +50,7 @@ export default function JoinExam() {
             </svg>
           </div>
           <h1>ExamPilot</h1>
-          <p className="join-subtitle">Digital. Einfach. Fair.</p>
+          <p className="join-subtitle">A New Classroom Experience</p>
         </div>
 
         {error && <div className="error-message">{error}</div>}
