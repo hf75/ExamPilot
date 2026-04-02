@@ -1,6 +1,8 @@
 import json
 import asyncio
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+
+from routers.auth import verify_token
 
 router = APIRouter()
 
@@ -24,7 +26,17 @@ async def broadcast(exam_id: int, event: str, data: dict = None):
 
 
 @router.websocket("/ws/exam/{exam_id}")
-async def exam_websocket(websocket: WebSocket, exam_id: int):
+async def exam_websocket(websocket: WebSocket, exam_id: int, token: str = Query("")):
+    # Verify teacher token before accepting connection
+    try:
+        payload = verify_token(token)
+        if payload.get("role") != "teacher":
+            await websocket.close(code=4003, reason="Forbidden")
+            return
+    except Exception:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
     await websocket.accept()
 
     if exam_id not in _connections:
@@ -33,7 +45,6 @@ async def exam_websocket(websocket: WebSocket, exam_id: int):
 
     try:
         while True:
-            # Keep connection alive, listen for pings
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text(json.dumps({"event": "pong"}))

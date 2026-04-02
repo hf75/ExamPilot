@@ -39,7 +39,8 @@ export default function LiveMonitor() {
     if (unmounted.current) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
-    const url = `${protocol}//${host}/ws/exam/${examId}`;
+    const token = localStorage.getItem("teacher_token") || "";
+    const url = `${protocol}//${host}/ws/exam/${examId}?token=${token}`;
 
     ws.current = new WebSocket(url);
     ws.current.onopen = () => {

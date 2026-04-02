@@ -55,6 +55,18 @@ async def duel_websocket(websocket: WebSocket, room_code: str):
                         action, room_code, client_info, player_id)
 
             if action == "host_connect":
+                # Verify teacher token for host role
+                host_token = msg.get("token", "")
+                try:
+                    from routers.auth import verify_token
+                    payload = verify_token(host_token)
+                    if payload.get("role") != "teacher":
+                        raise ValueError("Not a teacher")
+                except Exception:
+                    await websocket.send_text(json.dumps({
+                        "event": "error", "data": {"message": "Nicht autorisiert"},
+                    }))
+                    continue
                 is_host = True
                 room.host_ws = websocket
                 await websocket.send_text(json.dumps({
