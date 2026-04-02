@@ -12,10 +12,9 @@ export default function DuelLobby({ players, roomCode, mode, isHost, onStart }) 
     if (!isHost) return;
     // Fetch the server's LAN IP so phones can reach it
     api.get("/api/duels/server-info").then((info) => {
-      const url = `http://${info.ip}:${info.port}/duel?code=${roomCode}`;
-      setJoinUrl(url);
+      const base = info.tunnel_url || `http://${info.ip}:${info.port}`;
+      setJoinUrl(`${base}/duel?code=${roomCode}`);
     }).catch(() => {
-      // Fallback to current host
       setJoinUrl(`${window.location.origin}/duel?code=${roomCode}`);
     });
   }, [isHost, roomCode]);

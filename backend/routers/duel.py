@@ -275,7 +275,8 @@ async def get_server_info():
         s.close()
     except Exception:
         pass
-    return {"ip": ip, "port": 8000}
+    from services.tunnel_service import get_tunnel_url
+    return {"ip": ip, "port": 8000, "tunnel_url": get_tunnel_url()}
 
 
 @router.delete("/room/{room_code}")
