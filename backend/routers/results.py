@@ -403,6 +403,9 @@ async def get_exam_statistics(
         grade_counts.setdefault(g, 0)
 
     n = len(scores)
+    if not percents:
+        return {"class_stats": None, "task_stats": []}
+
     sorted_scores = sorted(scores)
     sorted_pct = sorted(percents)
     avg_percent = sum(percents) / n

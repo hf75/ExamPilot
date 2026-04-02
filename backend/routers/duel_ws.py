@@ -5,9 +5,9 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from services.duel_engine import (
-    get_room, add_player, remove_player, start_game,
+    get_room, remove_room, add_player, remove_player, start_game,
     submit_answer, advance_round, send_to_host, serialize_lobby,
-    select_pair, random_pair, end_game_early,
+    select_pair, random_pair, end_game_early, broadcast_to_room,
 )
 
 logger = logging.getLogger("uvicorn.error")
@@ -117,11 +117,17 @@ async def duel_websocket(websocket: WebSocket, room_code: str):
                      room_code, client_info, player_id, is_host)
         if is_host:
             room.host_ws = None
-        if player_id:
+            # Notify all players and close the room
+            await broadcast_to_room(room, "room_closed", {"message": "Der Host hat die Verbindung getrennt."})
+            remove_room(room_code)
+            logger.info("Duel room removed after host disconnect: %s", room_code)
+        elif player_id:
             await remove_player(room, player_id)
     except Exception as e:
         logger.error("Duel WS error in room %s client=%s: %s", room_code, client_info, e, exc_info=True)
         if is_host:
             room.host_ws = None
-        if player_id:
+            await broadcast_to_room(room, "room_closed", {"message": "Verbindungsfehler beim Host."})
+            remove_room(room_code)
+        elif player_id:
             await remove_player(room, player_id)

@@ -322,11 +322,24 @@ try {
   }
 
   function executeInIframe(html) {
+    // Create sandboxed iframe
+    const iframe = document.createElement("iframe");
+    iframe.sandbox = "allow-scripts";
+    iframe.style.display = "none";
+
+    let cleaned = false;
+    function cleanup() {
+      if (cleaned) return;
+      cleaned = true;
+      window.removeEventListener("message", handler);
+      clearTimeout(timeoutRef.current);
+      try { document.body.removeChild(iframe); } catch {}
+    }
+
     // Listen for results
     function handler(event) {
       if (event.data?.type === "coding-result") {
-        window.removeEventListener("message", handler);
-        clearTimeout(timeoutRef.current);
+        cleanup();
         setOutput(event.data.output || "");
         setTestResults(event.data.testResults || []);
         setRunning(false);
@@ -337,21 +350,13 @@ try {
 
     // Timeout after 15s
     timeoutRef.current = setTimeout(() => {
-      window.removeEventListener("message", handler);
+      cleanup();
       setOutput("Zeitueberschreitung: Code hat zu lange gebraucht (>15s).");
       setRunning(false);
     }, 15000);
 
-    // Create sandboxed iframe
-    const iframe = document.createElement("iframe");
-    iframe.sandbox = "allow-scripts";
-    iframe.style.display = "none";
     iframe.srcdoc = html;
     document.body.appendChild(iframe);
-
-    // Cleanup after result or timeout
-    const cleanup = () => { try { document.body.removeChild(iframe); } catch {} };
-    setTimeout(cleanup, 16000);
   }
 
   const testCases = questionData.test_cases || [];

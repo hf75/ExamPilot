@@ -60,5 +60,27 @@ def get_active_api_key() -> str:
         pass
     return ANTHROPIC_API_KEY
 
-SECRET_KEY = _resolve_env("SECRET_KEY", "exam-pilot-secret-key-change-me")
+def _get_or_create_secret_key() -> str:
+    """Return SECRET_KEY from env, or auto-generate and persist one."""
+    key = _resolve_env("SECRET_KEY")
+    if key:
+        return key
+    # Auto-generate a secure key and persist it to .env
+    import secrets
+    key = secrets.token_urlsafe(32)
+    env_path = APP_DIR / ".env"
+    try:
+        if env_path.exists():
+            content = env_path.read_text(encoding="utf-8")
+            if "SECRET_KEY" not in content:
+                with open(env_path, "a", encoding="utf-8") as f:
+                    f.write(f"\nSECRET_KEY={key}\n")
+        else:
+            env_path.write_text(f"SECRET_KEY={key}\n", encoding="utf-8")
+    except OSError:
+        pass  # Use in-memory key if file write fails
+    return key
+
+
+SECRET_KEY = _get_or_create_secret_key()
 TOKEN_EXPIRE_HOURS = 12

@@ -1,9 +1,12 @@
 import json
+import logging
 import re
 import asyncio
-from anthropic import Anthropic
+from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError, APIConnectionError
 
 from config import CLAUDE_MODEL, CLAUDE_MAX_TOKENS, get_active_api_key
+
+logger = logging.getLogger("uvicorn.error")
 
 # Rate limiting: simple semaphore for max 2 concurrent calls
 _semaphore = asyncio.Semaphore(2)
@@ -19,6 +22,43 @@ def get_client():
         _client = Anthropic(api_key=key)
         _client_key = key
     return _client
+
+
+async def _call_claude(system: str, messages: list, max_tokens: int = CLAUDE_MAX_TOKENS) -> str:
+    """Call Claude API with proper error handling. Returns response text."""
+    key = get_active_api_key()
+    if not key:
+        raise ValueError(
+            "Kein API-Key konfiguriert. Bitte unter Einstellungen einen Anthropic API-Key hinterlegen."
+        )
+    try:
+        async with _semaphore:
+            response = await asyncio.to_thread(
+                get_client().messages.create,
+                model=CLAUDE_MODEL,
+                max_tokens=max_tokens,
+                system=system,
+                messages=messages,
+            )
+        return response.content[0].text
+    except AuthenticationError:
+        logger.error("Claude API: Ungültiger API-Key")
+        raise ValueError(
+            "Der API-Key ist ungültig. Bitte in den Einstellungen einen gültigen Anthropic API-Key hinterlegen."
+        )
+    except RateLimitError:
+        logger.warning("Claude API: Rate-Limit erreicht")
+        raise ValueError(
+            "Das API-Kontingent ist erschöpft oder das Rate-Limit wurde erreicht. Bitte warten oder den Plan upgraden."
+        )
+    except APIConnectionError:
+        logger.error("Claude API: Verbindungsfehler")
+        raise ValueError(
+            "Verbindung zur KI fehlgeschlagen. Bitte Internetverbindung prüfen."
+        )
+    except APIError as e:
+        logger.error("Claude API-Fehler: %s", e)
+        raise ValueError(f"KI-Fehler: {e.message}")
 
 
 def _parse_json_response(text: str) -> dict | list:
@@ -119,16 +159,8 @@ Gesprächsprotokoll:
 
 Maximale Punktzahl: {max_points}"""
 
-        async with _semaphore:
-            response = await asyncio.to_thread(
-                get_client().messages.create,
-                model=CLAUDE_MODEL,
-                max_tokens=CLAUDE_MAX_TOKENS,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
-
-        result = _parse_json_response(response.content[0].text)
+        text = await _call_claude(system_prompt, [{"role": "user", "content": user_message}])
+        result = _parse_json_response(text)
         result["points"] = max(0, min(max_points, result.get("points", 0)))
         return result
 
@@ -170,16 +202,8 @@ Entscheidungsprotokoll:
 
 Maximale Punktzahl: {max_points}"""
 
-        async with _semaphore:
-            response = await asyncio.to_thread(
-                get_client().messages.create,
-                model=CLAUDE_MODEL,
-                max_tokens=CLAUDE_MAX_TOKENS,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
-
-        result = _parse_json_response(response.content[0].text)
+        text = await _call_claude(system_prompt, [{"role": "user", "content": user_message}])
+        result = _parse_json_response(text)
         result["points"] = max(0, min(max_points, result.get("points", 0)))
         return result
 
@@ -214,16 +238,8 @@ Exportierter Zustand der App (JSON):
 
 Maximale Punktzahl: {max_points}"""
 
-        async with _semaphore:
-            response = await asyncio.to_thread(
-                get_client().messages.create,
-                model=CLAUDE_MODEL,
-                max_tokens=CLAUDE_MAX_TOKENS,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
-
-        result = _parse_json_response(response.content[0].text)
+        text = await _call_claude(system_prompt, [{"role": "user", "content": user_message}])
+        result = _parse_json_response(text)
         result["points"] = max(0, min(max_points, result.get("points", 0)))
         return result
 
@@ -272,16 +288,8 @@ Eingereichter Code ({lang_label}):
 
 Maximale Punktzahl: {max_points}"""
 
-        async with _semaphore:
-            response = await asyncio.to_thread(
-                get_client().messages.create,
-                model=CLAUDE_MODEL,
-                max_tokens=CLAUDE_MAX_TOKENS,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
-
-        result = _parse_json_response(response.content[0].text)
+        text = await _call_claude(system_prompt, [{"role": "user", "content": user_message}])
+        result = _parse_json_response(text)
         result["points"] = max(0, min(max_points, result.get("points", 0)))
         return result
 
@@ -321,16 +329,8 @@ Antworte als JSON:
         else:
             content_blocks.append({"type": "text", "text": f"Antwort: {student_answer or 'Kein Foto eingereicht'}"})
 
-        async with _semaphore:
-            response = await asyncio.to_thread(
-                get_client().messages.create,
-                model=CLAUDE_MODEL,
-                max_tokens=CLAUDE_MAX_TOKENS,
-                system=system_prompt,
-                messages=[{"role": "user", "content": content_blocks}],
-            )
-
-        result = _parse_json_response(response.content[0].text)
+        text = await _call_claude(system_prompt, [{"role": "user", "content": content_blocks}])
+        result = _parse_json_response(text)
         result["points"] = max(0, min(max_points, result.get("points", 0)))
         return result
 
@@ -376,16 +376,8 @@ Antworte als JSON:
             },
         ]
 
-        async with _semaphore:
-            response = await asyncio.to_thread(
-                get_client().messages.create,
-                model=CLAUDE_MODEL,
-                max_tokens=CLAUDE_MAX_TOKENS,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_content}],
-            )
-
-        result = _parse_json_response(response.content[0].text)
+        text = await _call_claude(system_prompt, [{"role": "user", "content": user_content}])
+        result = _parse_json_response(text)
         result["points"] = max(0, min(max_points, result.get("points", 0)))
         return result
 
@@ -440,16 +432,8 @@ Antwort des Schülers: {student_answer}
 
 Maximale Punktzahl: {max_points}"""
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=CLAUDE_MAX_TOKENS,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
-
-    result = _parse_json_response(response.content[0].text)
+    text = await _call_claude(system_prompt, [{"role": "user", "content": user_message}])
+    result = _parse_json_response(text)
 
     # Ensure points are within range
     result["points"] = max(0, min(max_points, result.get("points", 0)))
@@ -547,16 +531,8 @@ Verwende Diagramme wenn sie zum Thema passen — besonders bei Datenbanken, Netz
     if instructions:
         user_message += f"\n\nZusätzliche Anweisungen des Lehrers:\n{instructions}"
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=64000,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
-
-    tasks = _parse_json_response(response.content[0].text)
+    text = await _call_claude(system_prompt, [{"role": "user", "content": user_message}], max_tokens=64000)
+    tasks = _parse_json_response(text)
 
     # Post-process: generate app_html for any webapp tasks
     for task in tasks:
@@ -632,16 +608,8 @@ Antworte als JSON:
   "question_data": {{ ... }}
 }}"""
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=CLAUDE_MAX_TOKENS,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
-
-    return _parse_json_response(response.content[0].text)
+    text = await _call_claude(system_prompt, [{"role": "user", "content": user_message}])
+    return _parse_json_response(text)
 
 
 async def explain_answer(
@@ -685,15 +653,7 @@ Bitte erkläre dem Schüler, was richtig/falsch war und wie er es besser machen 
     else:
         user_content = user_message
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=2000,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_content}],
-        )
-    return response.content[0].text
+    return await _call_claude(system_prompt, [{"role": "user", "content": user_content}], max_tokens=2000)
 
 
 async def feynman_respond(concept: str, context: str, task_text: str, messages: list[dict], is_last_turn: bool = False) -> str:
@@ -733,15 +693,7 @@ Deine Rolle:
         role = "user" if msg["role"] == "student" else "assistant"
         claude_messages.append({"role": role, "content": msg["content"]})
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=500,
-            system=system_prompt,
-            messages=claude_messages,
-        )
-    return response.content[0].text
+    return await _call_claude(system_prompt, claude_messages, max_tokens=500)
 
 
 async def scenario_respond(
@@ -794,16 +746,8 @@ Achte auf korrektes JSON-Escaping! Anführungszeichen in Strings MÜSSEN escaped
     if not claude_messages:
         claude_messages = [{"role": "user", "content": "Starte das Szenario."}]
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=1000,
-            system=system_prompt,
-            messages=claude_messages,
-        )
-
-    return _parse_json_response(response.content[0].text)
+    text = await _call_claude(system_prompt, claude_messages, max_tokens=1000)
+    return _parse_json_response(text)
 
 
 async def generate_webapp(description: str, grader_info: str = "") -> str:
@@ -851,16 +795,7 @@ Antworte NUR mit dem kompletten HTML-Code. Keine Erklärungen, kein Markdown, ke
 
 {description}{grader_hint}"""
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=64000,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
-
-    html = response.content[0].text.strip()
+    html = (await _call_claude(system_prompt, [{"role": "user", "content": user_message}], max_tokens=64000)).strip()
     # Strip markdown code blocks if present
     if html.startswith("```"):
         lines = html.split("\n")
@@ -917,13 +852,4 @@ Wenn alle Aufgaben über 70% Erfolgsquote haben, erwähne trotzdem die schwächs
 
     user_message = "# Klassenarbeitsergebnisse\n\n" + "\n".join(parts)
 
-    async with _semaphore:
-        response = await asyncio.to_thread(
-            get_client().messages.create,
-            model=CLAUDE_MODEL,
-            max_tokens=4000,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
-
-    return response.content[0].text.strip()
+    return (await _call_claude(system_prompt, [{"role": "user", "content": user_message}], max_tokens=4000)).strip()

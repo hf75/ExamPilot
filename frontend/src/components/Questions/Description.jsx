@@ -4,7 +4,7 @@ export default function Description({ task, questionData, answer, onChange, disa
   // Auto-mark as "answered" since no response needed
   useEffect(() => {
     if (!answer) onChange("_seen");
-  }, []);
+  }, [answer, onChange]);
 
   return (
     <div className="question-description">
