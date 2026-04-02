@@ -954,15 +954,60 @@ a:hover {
 .exam-detail {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+}
+
+.exam-detail-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .exam-detail-header {
-  margin-top: 8px;
+  flex: 1;
 }
 
 .exam-detail-header h2 {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.exam-detail-columns {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  min-height: 0;
+}
+
+.exam-detail-pool {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+
+.exam-detail-pool h3 {
+  margin-bottom: 10px;
+  font-size: 15px;
+}
+
+.exam-detail-tasks {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+
+.exam-detail-tasks h3 {
+  margin-bottom: 10px;
+  font-size: 15px;
 }
 
 .exam-points-total {
@@ -3699,6 +3744,14 @@ a:hover {
 
   .progress-matrix thead .matrix-name-col {
     background: var(--bg-secondary);
+  }
+
+  .exam-detail-columns {
+    flex-direction: column;
+  }
+  .exam-detail-pool,
+  .exam-detail-tasks {
+    max-height: none;
   }
 
   /* Form rows: stack on tablet */

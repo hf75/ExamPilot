@@ -885,104 +885,96 @@ function ExamDetail({ exam, onBack }) {
 
   return (
     <div className="exam-detail">
-      <button className="btn-secondary" onClick={onBack}>
-        &larr; Zurück
-      </button>
-
-      <div className="exam-detail-header">
-        <h2>{exam.title}</h2>
-        <div className="exam-meta">
-          {exam.class_name && <span className="exam-class">{exam.class_name}</span>}
-          <span className="exam-points-total">{totalPoints} Punkte gesamt</span>
-          <span className="task-count">{examTasks.length} Aufgaben</span>
+      <div className="exam-detail-topbar">
+        <button className="btn-secondary" onClick={onBack}>
+          &larr; Zurück
+        </button>
+        <div className="exam-detail-header">
+          <h2>{exam.title}</h2>
+          <div className="exam-meta">
+            {exam.class_name && <span className="exam-class">{exam.class_name}</span>}
+            <span className="exam-points-total">{totalPoints} Punkte gesamt</span>
+            <span className="task-count">{examTasks.length} Aufgaben</span>
+          </div>
         </div>
       </div>
 
-      <div className="exam-tasks-section">
-        <h3>Aufgaben in dieser Klassenarbeit</h3>
-        {examTasks.length === 0 ? (
-          <p className="empty-state">
-            Noch keine Aufgaben. Füge Aufgaben aus dem Pool hinzu.
-          </p>
-        ) : (
-          <div className="exam-task-list">
-            {examTasks.map((task, index) => (
-              <div key={task.id} className="exam-task-item-wrap">
-                <span className="exam-task-pos">{index + 1}.</span>
+      <div className="exam-detail-columns">
+        {/* Left: Pool browser */}
+        <div className="exam-detail-pool">
+          <h3>Aufgabenpool</h3>
+          <div className="pool-filter-row">
+            <select
+              className="pool-select"
+              value={selectedPoolId || ""}
+              onChange={(e) => setSelectedPoolId(parseInt(e.target.value))}
+            >
+              {pools.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.task_count})
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Suchen..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="pool-task-list">
+            {availableTasks.map((task) => (
+              <div key={task.id} className="pool-task-item-wrap">
                 <TaskPreview
                   task={task}
-                  expanded={expandedExamTask === task.id}
-                  onToggle={() => setExpandedExamTask(expandedExamTask === task.id ? null : task.id)}
+                  expanded={expandedPoolTask === task.id}
+                  onToggle={() => setExpandedPoolTask(expandedPoolTask === task.id ? null : task.id)}
                 >
                   <button
-                    className="btn-small btn-danger"
-                    onClick={(e) => { e.stopPropagation(); removeTask(task.id); }}
+                    className="btn-primary-sm"
+                    onClick={(e) => { e.stopPropagation(); addTask(task.id); }}
                   >
-                    Entfernen
+                    +
                   </button>
                 </TaskPreview>
               </div>
             ))}
+            {availableTasks.length === 0 && (
+              <p className="empty-state">Keine verfügbaren Aufgaben.</p>
+            )}
           </div>
-        )}
-      </div>
-
-      <div className="pool-section">
-        <div className="pool-header">
-          <h3>Aufgaben aus Pool hinzufügen</h3>
-          <button
-            className="btn-small"
-            onClick={() => setShowPool(!showPool)}
-          >
-            {showPool ? "Ausblenden" : "Pool anzeigen"}
-          </button>
         </div>
 
-        {showPool && (
-          <>
-            <div className="pool-filter-row">
-              <select
-                className="pool-select"
-                value={selectedPoolId || ""}
-                onChange={(e) => setSelectedPoolId(parseInt(e.target.value))}
-              >
-                {pools.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.task_count})
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                className="search-input"
-                placeholder="Aufgaben durchsuchen..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <div className="pool-task-list">
-              {availableTasks.map((task) => (
-                <div key={task.id} className="pool-task-item-wrap">
+        {/* Right: Exam tasks */}
+        <div className="exam-detail-tasks">
+          <h3>Aufgaben in der Klassenarbeit</h3>
+          {examTasks.length === 0 ? (
+            <p className="empty-state">
+              Noch keine Aufgaben. Füge Aufgaben aus dem Pool links hinzu.
+            </p>
+          ) : (
+            <div className="exam-task-list">
+              {examTasks.map((task, index) => (
+                <div key={task.id} className="exam-task-item-wrap">
+                  <span className="exam-task-pos">{index + 1}.</span>
                   <TaskPreview
                     task={task}
-                    expanded={expandedPoolTask === task.id}
-                    onToggle={() => setExpandedPoolTask(expandedPoolTask === task.id ? null : task.id)}
+                    expanded={expandedExamTask === task.id}
+                    onToggle={() => setExpandedExamTask(expandedExamTask === task.id ? null : task.id)}
                   >
                     <button
-                      className="btn-primary-sm"
-                      onClick={(e) => { e.stopPropagation(); addTask(task.id); }}
+                      className="btn-small btn-danger"
+                      onClick={(e) => { e.stopPropagation(); removeTask(task.id); }}
                     >
-                      Hinzufügen
+                      Entfernen
                     </button>
                   </TaskPreview>
                 </div>
               ))}
-              {availableTasks.length === 0 && (
-                <p className="empty-state">Keine verfügbaren Aufgaben in diesem Pool.</p>
-              )}
             </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
