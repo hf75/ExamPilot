@@ -983,7 +983,7 @@ a:hover {
 }
 
 .exam-detail-pool {
-  flex: 1;
+  flex: 2;
   min-width: 0;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -999,7 +999,7 @@ a:hover {
 }
 
 .exam-detail-tasks {
-  flex: 1;
+  flex: 3;
   min-width: 0;
   background: var(--bg-card);
   border: 1px solid var(--border);
