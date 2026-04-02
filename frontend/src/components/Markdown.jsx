@@ -53,6 +53,7 @@ export default function Markdown({ children }) {
   return (
     <div className="md-content">
       <ReactMarkdown
+        urlTransform={(url) => url}
         components={{
           code({ className, children: codeChildren, ...props }) {
             const match = /language-mermaid/.test(className || "");
