@@ -2,6 +2,7 @@ import bcrypt
 import jwt
 import datetime
 import time
+import uuid
 from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -13,6 +14,10 @@ from models import LoginRequest, SetupPasswordRequest, TokenResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 security = HTTPBearer()
+
+# Revoked JWT IDs (jti): set of revoked token IDs with expiry tracking
+_revoked_tokens: dict[str, float] = {}  # {jti: expiry_timestamp}
+_MAX_REVOKED = 1000
 
 # Simple rate limiter: {ip: [timestamps]}
 _rate_limits: dict[str, list[float]] = defaultdict(list)
@@ -44,22 +49,36 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
+def _cleanup_revoked():
+    """Remove expired entries from revocation list."""
+    now = time.time()
+    expired = [jti for jti, exp in _revoked_tokens.items() if exp < now]
+    for jti in expired:
+        _revoked_tokens.pop(jti, None)
+
+
 def create_token() -> str:
+    exp = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=TOKEN_EXPIRE_HOURS)
     payload = {
         "role": "teacher",
-        "exp": datetime.datetime.now(datetime.timezone.utc)
-        + datetime.timedelta(hours=TOKEN_EXPIRE_HOURS),
+        "jti": str(uuid.uuid4()),
+        "exp": exp,
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 
 def verify_token(token: str) -> dict:
     try:
-        return jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token abgelaufen")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Ungültiger Token")
+    # Check revocation
+    jti = payload.get("jti")
+    if jti and jti in _revoked_tokens:
+        raise HTTPException(status_code=401, detail="Token wurde widerrufen")
+    return payload
 
 
 async def require_teacher(
@@ -118,6 +137,23 @@ async def login(req: LoginRequest, request: Request, db: aiosqlite.Connection = 
 
     token = create_token()
     return TokenResponse(token=token)
+
+
+@router.post("/logout")
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Revoke the current JWT token."""
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
+        jti = payload.get("jti")
+        exp = payload.get("exp", 0)
+        if jti:
+            _cleanup_revoked()
+            _revoked_tokens[jti] = exp
+    except jwt.InvalidTokenError:
+        pass  # Token already invalid, nothing to revoke
+    return {"message": "Abgemeldet"}
 
 
 @router.get("/settings")

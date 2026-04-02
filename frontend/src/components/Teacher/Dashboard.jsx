@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
-import { clearToken } from "../../api/client";
+import { api, clearToken } from "../../api/client";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  function handleLogout() {
+  async function handleLogout() {
+    try { await api.post("/api/auth/logout"); } catch {}
     clearToken();
     navigate("/login");
   }

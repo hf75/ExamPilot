@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from config import BUNDLE_DIR
 from database import init_db
@@ -42,6 +43,48 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ExamPilot", version="1.0.0", lifespan=lifespan)
+
+# CSRF protection: require custom header on state-changing requests
+# Browsers won't send custom headers in cross-origin requests without CORS preflight
+class CSRFMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            # Skip for WebSocket upgrades and LTI callbacks
+            path = request.url.path
+            if not path.startswith("/ws/") and not path.startswith("/api/lti/"):
+                if request.headers.get("Content-Type", "").startswith("application/json"):
+                    # JSON requests from fetch() are safe (browsers enforce CORS preflight)
+                    pass
+                elif request.headers.get("Content-Type", "").startswith("multipart/form-data"):
+                    # File uploads: check for our custom header
+                    if not request.headers.get("Authorization"):
+                        from fastapi.responses import JSONResponse
+                        return JSONResponse(status_code=403, content={"detail": "CSRF check failed"})
+        return await call_next(request)
+
+
+# Security headers
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self' ws: wss:; "
+            "frame-src 'self' blob:; "
+            "font-src 'self'; "
+            "object-src 'none'; "
+            "base-uri 'self'"
+        )
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(CSRFMiddleware)
 
 # CORS for development (React dev server on :5173)
 app.add_middleware(
