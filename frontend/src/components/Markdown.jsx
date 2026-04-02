@@ -1,5 +1,6 @@
 import { useEffect, useRef, useId } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // Lazy-load mermaid from CDN
 let mermaidPromise = null;
@@ -53,6 +54,7 @@ export default function Markdown({ children }) {
   return (
     <div className="md-content">
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         urlTransform={(url) => url}
         components={{
           code({ className, children: codeChildren, ...props }) {
