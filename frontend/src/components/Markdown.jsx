@@ -1,4 +1,4 @@
-import { useEffect, useRef, useId } from "react";
+import { useState, useEffect, useRef, useId, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -50,6 +50,19 @@ function MermaidBlock({ code }) {
 }
 
 export default function Markdown({ children }) {
+  const [lightbox, setLightbox] = useState(null);
+
+  const closeLightbox = useCallback((e) => {
+    if (e.key === "Escape") setLightbox(null);
+  }, []);
+
+  useEffect(() => {
+    if (lightbox) {
+      document.addEventListener("keydown", closeLightbox);
+      return () => document.removeEventListener("keydown", closeLightbox);
+    }
+  }, [lightbox, closeLightbox]);
+
   if (!children) return null;
   return (
     <div className="md-content">
@@ -71,6 +84,8 @@ export default function Markdown({ children }) {
                 alt={alt || ""}
                 className="md-embedded-image"
                 loading="lazy"
+                onDoubleClick={() => setLightbox(src)}
+                title="Doppelklick zum Vergrößern"
                 {...props}
               />
             );
@@ -79,6 +94,12 @@ export default function Markdown({ children }) {
       >
         {children}
       </ReactMarkdown>
+
+      {lightbox && (
+        <div className="image-lightbox" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="" />
+        </div>
+      )}
     </div>
   );
 }
