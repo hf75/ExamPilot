@@ -194,7 +194,8 @@ async def _post_process_tasks(tasks: list, image_map: dict[str, str] | None = No
                     if img_id not in task.get("text", ""):
                         task["text"] = task.get("text", "") + img_md
         # Clean up any unreferenced image placeholders (all formats)
-        _img_cleanup = r'\{\{?img_\d+\}\}?|!\[img_\d+\]\([^)]*\)|!\[img_\d+\](?!\()'
+        # But preserve correctly embedded images (those with data: URLs)
+        _img_cleanup = r'\{\{?img_\d+\}\}?|!\[img_\d+\]\((?!data:)[^)]*\)|!\[img_\d+\](?!\()'
         task["text"] = re.sub(_img_cleanup, '', task["text"])
         if task.get("solution"):
             task["solution"] = re.sub(_img_cleanup, '', task["solution"])
