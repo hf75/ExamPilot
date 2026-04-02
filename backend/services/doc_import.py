@@ -6,11 +6,14 @@ No external tools (LibreOffice, pandoc) required.
 """
 
 import json
+import logging
 import re
 import base64
 import io
 
 from config import CLAUDE_MODEL
+
+logger = logging.getLogger("uvicorn.error")
 
 
 def _parse_json_response(text: str) -> list:
@@ -369,6 +372,7 @@ async def import_document(file_path: str, original_filename: str, allowed_types:
 
     from services.claude_service import _call_claude
     text = await _call_claude(SYSTEM_PROMPT, [{"role": "user", "content": content}], max_tokens=64000)
+    logger.info("Doc import: Claude response length=%d, first 200 chars: %s", len(text), text[:200])
     tasks = _parse_json_response(text)
 
     # Validate, embed images, and post-process
@@ -408,6 +412,7 @@ async def import_document_with_instructions(
 
     from services.claude_service import _call_claude
     text = await _call_claude(SYSTEM_PROMPT, [{"role": "user", "content": content}], max_tokens=64000)
+    logger.info("Doc import (with instructions): Claude response length=%d, first 200 chars: %s", len(text), text[:200])
     tasks = _parse_json_response(text)
 
     # Validate, embed images, and post-process
