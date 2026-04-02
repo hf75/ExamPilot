@@ -412,7 +412,8 @@ async def import_document_with_instructions(
 
     from services.claude_service import _call_claude
     text = await _call_claude(SYSTEM_PROMPT, [{"role": "user", "content": content}], max_tokens=64000)
-    logger.info("Doc import (with instructions): Claude response length=%d, first 200 chars: %s", len(text), text[:200])
+    logger.info("Doc import (with instructions): response length=%d, first 200: %s", len(text), text[:200])
+    logger.info("Doc import (with instructions): last 300: %s", text[-300:])
     tasks = _parse_json_response(text)
 
     # Validate, embed images, and post-process
