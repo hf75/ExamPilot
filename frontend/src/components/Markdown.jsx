@@ -49,6 +49,72 @@ function MermaidBlock({ code }) {
   return <div ref={ref} className="mermaid-diagram" />;
 }
 
+function ImageLightbox({ src, onClose }) {
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const dragging = useRef(false);
+  const lastPos = useRef({ x: 0, y: 0 });
+
+  function handleWheel(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setScale((s) => Math.min(10, Math.max(0.5, s * delta)));
+  }
+
+  function handlePointerDown(e) {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    dragging.current = true;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    e.target.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e) {
+    if (!dragging.current) return;
+    const dx = e.clientX - lastPos.current.x;
+    const dy = e.clientY - lastPos.current.y;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    setTranslate((t) => ({ x: t.x + dx, y: t.y + dy }));
+  }
+
+  function handlePointerUp() {
+    dragging.current = false;
+  }
+
+  function handleBackdropClick(e) {
+    if (e.target === e.currentTarget) onClose();
+  }
+
+  function resetView() {
+    setScale(1);
+    setTranslate({ x: 0, y: 0 });
+  }
+
+  return (
+    <div className="image-lightbox" onClick={handleBackdropClick} onWheel={handleWheel}>
+      <div className="lightbox-controls">
+        <button onClick={() => setScale((s) => Math.min(10, s * 1.3))}>+</button>
+        <button onClick={() => setScale((s) => Math.max(0.5, s / 1.3))}>-</button>
+        <button onClick={resetView}>1:1</button>
+        <button onClick={onClose}>&times;</button>
+      </div>
+      <img
+        src={src}
+        alt=""
+        style={{
+          transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+          cursor: dragging.current ? "grabbing" : "grab",
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        draggable={false}
+      />
+    </div>
+  );
+}
+
 export default function Markdown({ children }) {
   const [lightbox, setLightbox] = useState(null);
 
@@ -96,9 +162,7 @@ export default function Markdown({ children }) {
       </ReactMarkdown>
 
       {lightbox && (
-        <div className="image-lightbox" onClick={() => setLightbox(null)}>
-          <img src={lightbox} alt="" />
-        </div>
+        <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
       )}
     </div>
   );
