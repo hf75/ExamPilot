@@ -20,14 +20,20 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # Start Cloudflare Tunnel if enabled in settings
-    from services.tunnel_service import is_tunnel_enabled, start_tunnel, stop_tunnel, get_tunnel_url
-    tunnel_url = None
+    from services.tunnel_service import is_tunnel_enabled, start_tunnel, stop_tunnel
     if is_tunnel_enabled():
         tunnel_url = await start_tunnel(port=8000)
         if tunnel_url:
             print()
-            print(f"  HTTPS:    {tunnel_url}")
-            print(f"  (Cloudflare Tunnel aktiv)")
+            print("\033[1;32m" + "=" * 52 + "\033[0m")
+            print("\033[1;32m  HTTPS-Tunnel aktiv!\033[0m")
+            print()
+            print(f"\033[1;37m  {tunnel_url}\033[0m")
+            print()
+            print("  Diese URL mit Schuelern teilen.")
+            print("  Echtes HTTPS-Zertifikat, kein Setup noetig.")
+            print("\033[1;32m" + "=" * 52 + "\033[0m")
+            print()
 
     yield
 
