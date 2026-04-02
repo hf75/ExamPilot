@@ -1,19 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function TrueFalse({ task, questionData, answer, onChange, disabled }) {
   const [selected, setSelected] = useState(answer || "");
+  const isInternal = useRef(false);
 
+  // Sync from parent (external answer changes)
   useEffect(() => {
-    if (answer !== selected) setSelected(answer || "");
+    if (!isInternal.current && answer !== selected) {
+      setSelected(answer || "");
+    }
+    isInternal.current = false;
   }, [answer]);
-
-  useEffect(() => {
-    if (selected) onChange(selected);
-  }, [selected]);
 
   function handleChange(value) {
     if (disabled) return;
+    isInternal.current = true;
     setSelected(value);
+    onChange(value);
   }
 
   return (

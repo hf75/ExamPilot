@@ -30,7 +30,10 @@ def _float(el, tag, default=0.0):
 
 def parse_moodle_xml(xml_content: str) -> list[dict]:
     """Parse Moodle XML and return list of task dicts with question_data."""
-    root = ET.fromstring(xml_content)
+    try:
+        root = ET.fromstring(xml_content)
+    except ET.ParseError as e:
+        raise ValueError(f"Ungültiges XML: {e}")
     tasks = []
 
     for q in root.findall(".//question"):
@@ -190,9 +193,12 @@ def parse_moodle_xml(xml_content: str) -> list[dict]:
                         frac = 100
                         part = part[1:]
                     elif part.startswith("%"):
-                        end = part.index("%", 1)
-                        frac = float(part[1:end])
-                        part = part[end + 1:]
+                        try:
+                            end = part.index("%", 1)
+                            frac = float(part[1:end])
+                            part = part[end + 1:]
+                        except (ValueError, IndexError):
+                            frac = 0
                     fb = ""
                     if "#" in part:
                         part, fb = part.split("#", 1)
@@ -342,5 +348,9 @@ def export_moodle_xml(tasks: list[dict]) -> str:
 
     # Pretty print
     rough = ET.tostring(root, encoding="unicode", xml_declaration=False)
-    dom = minidom.parseString(rough)
-    return dom.toprettyxml(indent="  ", encoding=None)
+    try:
+        dom = minidom.parseString(rough)
+        return dom.toprettyxml(indent="  ", encoding=None)
+    except Exception:
+        # Fallback: return raw XML if pretty-printing fails
+        return '<?xml version="1.0" ?>\n' + rough

@@ -313,6 +313,27 @@ function ExamForm({ exam, onSave, onCancel }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    // Validate grading scale if set
+    if (gradingScale && gradingScale.length > 0) {
+      for (const entry of gradingScale) {
+        const p = entry.percent;
+        if (p < 0 || p > 100 || isNaN(p)) {
+          toast.error("Notenschlüssel: Alle Prozentwerte müssen zwischen 0 und 100 liegen.");
+          return;
+        }
+        if (!entry.grade.trim() || !entry.label.trim()) {
+          toast.error("Notenschlüssel: Note und Bezeichnung dürfen nicht leer sein.");
+          return;
+        }
+      }
+      const percents = gradingScale.map(e => e.percent);
+      for (let i = 1; i < percents.length; i++) {
+        if (percents[i] >= percents[i - 1]) {
+          toast.error("Notenschlüssel: Prozentwerte müssen absteigend sortiert sein.");
+          return;
+        }
+      }
+    }
     setSaving(true);
     try {
       const payload = {
