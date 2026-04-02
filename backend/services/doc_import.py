@@ -198,6 +198,10 @@ async def _post_process_tasks(tasks: list, image_map: dict[str, str] | None = No
     """Validate tasks, embed referenced images, and generate app_html for webapp tasks."""
     from services.claude_service import generate_webapp
 
+    logger.info("_post_process_tasks: %d tasks, image_map has %d images: %s",
+                len(tasks), len(image_map) if image_map else 0,
+                list(image_map.keys()) if image_map else [])
+
     for task in tasks:
         if not isinstance(task, dict):
             continue
@@ -212,35 +216,41 @@ async def _post_process_tasks(tasks: list, image_map: dict[str, str] | None = No
 
         # Embed referenced images into task text as Markdown images
         referenced_images = task.pop("images", []) or []
+        logger.info("Task '%s': referenced_images=%s, has_image_map=%s",
+                    task.get("title", "?")[:30], referenced_images, bool(image_map))
         if image_map and referenced_images:
             for img_id in referenced_images:
                 if img_id in image_map:
                     data_url = image_map[img_id]
-                    img_md = f"\n\n![{img_id}]({data_url})\n\n"
+                    img_md = f"\n\n![{img_id}]({data_url[:60]}...)\n\n"
+                    logger.info("  Replacing %s (data_url len=%d)", img_id, len(data_url))
+                    # Use full data_url for the actual replacement
+                    img_md_full = f"\n\n![{img_id}]({data_url})\n\n"
+                    replaced = False
                     for field in ("text", "solution"):
                         val = task.get(field, "")
                         if not val:
                             continue
-                        # Replace all known placeholder formats Claude might use:
-                        # {{img_1}}, {img_1}, ![img_1](), ![img_1](img_1), ![img_1]
                         new_val = val
-                        new_val = new_val.replace("{{" + img_id + "}}", img_md)
-                        new_val = new_val.replace("{" + img_id + "}", img_md)
-                        # Markdown image with empty or self-referencing URL
+                        new_val = new_val.replace("{{" + img_id + "}}", img_md_full)
+                        new_val = new_val.replace("{" + img_id + "}", img_md_full)
                         new_val = re.sub(
                             r'!\[' + re.escape(img_id) + r'\]\([^)]*\)',
-                            img_md, new_val
+                            img_md_full, new_val
                         )
-                        # Markdown image reference without URL: ![img_1]
                         new_val = re.sub(
                             r'!\[' + re.escape(img_id) + r'\](?!\()',
-                            img_md, new_val
+                            img_md_full, new_val
                         )
                         if new_val != val:
                             task[field] = new_val
-                    # If no placeholder was found anywhere, append at end
-                    if img_id not in task.get("text", ""):
-                        task["text"] = task.get("text", "") + img_md
+                            replaced = True
+                            logger.info("  Replaced %s in field '%s'", img_id, field)
+                    if not replaced:
+                        task["text"] = task.get("text", "") + img_md_full
+                        logger.info("  Appended %s at end of text", img_id)
+                else:
+                    logger.warning("  %s NOT in image_map!", img_id)
         # Clean up any unreferenced image placeholders (all formats)
         # But preserve correctly embedded images (those with data: URLs)
         _img_cleanup = r'\{\{?img_\d+\}\}?|!\[img_\d+\]\((?!data:)[^)]*\)|!\[img_\d+\](?!\()'
