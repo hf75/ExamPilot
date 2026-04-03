@@ -73,7 +73,8 @@ async def export_student_pdf(
     _auth: bool = Depends(require_teacher_or_token),
 ):
     cursor = await db.execute(
-        """SELECT es.*, e.title as exam_title, e.grading_scale as exam_grading_scale,
+        """SELECT es.*, e.title as exam_title, e.class_name, e.date as exam_date,
+                  e.grading_scale as exam_grading_scale,
                   s.name as student_name
            FROM exam_sessions es
            JOIN exams e ON e.id = es.exam_id
@@ -87,7 +88,8 @@ async def export_student_pdf(
     session = dict(session)
 
     cursor = await db.execute(
-        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points
+        """SELECT a.*, t.title as task_title, t.text as task_text, t.points as max_points,
+                  t.solution, t.task_type
            FROM answers a
            JOIN tasks t ON t.id = a.task_id
            WHERE a.session_id = ?""",
@@ -111,6 +113,9 @@ async def export_student_pdf(
         session["total_points"],
         session["max_points"],
         student_scale,
+        class_name=session.get("class_name", ""),
+        exam_date=session.get("exam_date", ""),
+        solution_mode="correct",
     )
     return StreamingResponse(
         buffer,

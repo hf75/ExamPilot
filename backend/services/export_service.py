@@ -1,4 +1,5 @@
 import io
+from datetime import datetime
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -9,8 +10,10 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle,
+    HRFlowable,
+    KeepTogether,
 )
-from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
@@ -27,61 +30,189 @@ def _register_fonts():
         return "Helvetica", "Helvetica-Bold"
 
 
-def generate_student_pdf(student_name, exam_title, answers, total_points, max_points, grading_scale=None):
-    """Generate PDF for a single student's results."""
+def _escape(text: str) -> str:
+    """Escape HTML special chars for ReportLab Paragraph."""
+    if not text:
+        return ""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def generate_student_pdf(student_name, exam_title, answers, total_points, max_points,
+                         grading_scale=None, class_name="", exam_date="", solution_mode="none"):
+    """Generate a print-ready PDF for a single student's results.
+
+    solution_mode: "none" (no solutions), "correct" (show solution for wrong answers),
+                   "all" (show all solutions)
+    """
     font, font_bold = _register_fonts()
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20 * mm, bottomMargin=20 * mm)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        topMargin=15 * mm, bottomMargin=20 * mm,
+        leftMargin=18 * mm, rightMargin=18 * mm,
+    )
 
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle("Title2", parent=styles["Title"], fontName=font_bold, fontSize=16))
-    styles.add(ParagraphStyle("Normal2", parent=styles["Normal"], fontName=font, fontSize=10))
-    styles.add(ParagraphStyle("Bold2", parent=styles["Normal"], fontName=font_bold, fontSize=10))
-    styles.add(ParagraphStyle("Small", parent=styles["Normal"], fontName=font, fontSize=9, textColor=colors.grey))
+    styles.add(ParagraphStyle("DocTitle", fontName=font_bold, fontSize=16, spaceAfter=2 * mm))
+    styles.add(ParagraphStyle("Normal2", fontName=font, fontSize=10, leading=13))
+    styles.add(ParagraphStyle("Bold2", fontName=font_bold, fontSize=10, leading=13))
+    styles.add(ParagraphStyle("Small", fontName=font, fontSize=8.5, textColor=colors.HexColor("#64748b"), leading=11))
+    styles.add(ParagraphStyle("SmallBold", fontName=font_bold, fontSize=8.5, textColor=colors.HexColor("#64748b"), leading=11))
+    styles.add(ParagraphStyle("TaskTitle", fontName=font_bold, fontSize=11, leading=14))
+    styles.add(ParagraphStyle("Solution", fontName=font, fontSize=9, textColor=colors.HexColor("#166534"),
+                               leading=12, leftIndent=8, borderPadding=4))
+    styles.add(ParagraphStyle("Feedback", fontName=font, fontSize=9, textColor=colors.HexColor("#475569"),
+                               leading=12, leftIndent=8))
+    styles.add(ParagraphStyle("RightAlign", fontName=font, fontSize=8.5, alignment=TA_RIGHT,
+                               textColor=colors.HexColor("#94a3b8")))
 
     elements = []
 
-    # Header
-    elements.append(Paragraph(exam_title, styles["Title2"]))
+    # === HEADER ===
+    elements.append(Paragraph(_escape(exam_title), styles["DocTitle"]))
+
+    # Subheader: class + date
+    sub_parts = []
+    if class_name:
+        sub_parts.append(f"Klasse: {_escape(class_name)}")
+    if exam_date:
+        sub_parts.append(f"Datum: {_escape(exam_date)}")
+    else:
+        sub_parts.append(f"Datum: {datetime.now().strftime('%d.%m.%Y')}")
+    if sub_parts:
+        elements.append(Paragraph(" | ".join(sub_parts), styles["Small"]))
     elements.append(Spacer(1, 4 * mm))
 
+    # === RESULT BOX ===
     grade, grade_label, percent = calculate_grade(total_points or 0, max_points or 1, grading_scale)
-    header_data = [
-        ["Schueler:", student_name, "Punkte:", f"{total_points or 0} / {max_points or 0}"],
-        ["", "", "Prozent:", f"{percent}%"],
-        ["", "", "Note:", f"{grade} ({grade_label})"],
+    result_data = [
+        [
+            Paragraph(f"<b>Schueler/in:</b> {_escape(student_name)}", styles["Normal2"]),
+            Paragraph(f"<b>Punkte:</b> {total_points or 0} / {max_points or 0}", styles["Normal2"]),
+            Paragraph(f"<b>Note:</b> {grade} ({_escape(grade_label)})", styles["Normal2"]),
+            Paragraph(f"<b>{percent}%</b>", styles["Normal2"]),
+        ]
     ]
-    header_table = Table(header_data, colWidths=[60, 200, 50, 100])
-    header_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), font),
-        ("FONTNAME", (0, 0), (0, -1), font_bold),
-        ("FONTNAME", (2, 0), (2, -1), font_bold),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    result_table = Table(result_data, colWidths=[170, 120, 120, 50])
+    result_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f1f5f9")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]))
-    elements.append(header_table)
-    elements.append(Spacer(1, 8 * mm))
+    elements.append(result_table)
+    elements.append(Spacer(1, 6 * mm))
 
-    # Answers
+    # === ANSWERS ===
     for i, answer in enumerate(answers):
         task_title = answer.get("task_title", f"Aufgabe {i + 1}")
         task_text = answer.get("task_text", "")
-        student_answer = answer.get("student_answer", "Keine Antwort")
-        pts = answer.get("points_awarded", 0)
+        student_answer = answer.get("student_answer", "")
+        pts = answer.get("points_awarded")
         max_pts = answer.get("max_points", 0)
         feedback = answer.get("feedback", "")
+        solution = answer.get("solution", "")
+        is_correct = answer.get("is_correct", False)
+        task_type = answer.get("task_type", "essay")
 
-        elements.append(Paragraph(
-            f"<b>{task_title}</b> ({pts or 0}/{max_pts} Punkte)", styles["Bold2"]
+        # Points color
+        pts_display = f"{pts if pts is not None else '?'}/{max_pts}"
+        pts_color = "#166534" if is_correct else "#b91c1c" if pts is not None else "#64748b"
+
+        task_elements = []
+
+        # Task header with number and points
+        task_elements.append(Paragraph(
+            f"<b>Aufgabe {i + 1}: {_escape(task_title)}</b>"
+            f'  <font color="{pts_color}">({pts_display} Punkte)</font>',
+            styles["TaskTitle"]
         ))
-        elements.append(Spacer(1, 2 * mm))
-        elements.append(Paragraph(task_text[:500], styles["Normal2"]))
-        elements.append(Spacer(1, 2 * mm))
-        elements.append(Paragraph(f"<b>Antwort:</b> {student_answer[:500]}", styles["Normal2"]))
+        task_elements.append(Spacer(1, 1.5 * mm))
+
+        # Task text (truncated for very long texts)
+        if task_text and task_type != "description":
+            # Strip base64 images from text for PDF (they'd be huge)
+            import re
+            clean_text = re.sub(r'!\[img_\d+\]\(data:[^)]+\)', '[Bild]', task_text)
+            if len(clean_text) > 600:
+                clean_text = clean_text[:600] + "..."
+            task_elements.append(Paragraph(_escape(clean_text), styles["Small"]))
+            task_elements.append(Spacer(1, 1.5 * mm))
+
+        # Student answer
+        if student_answer and task_type not in ("description", "drawing", "photo"):
+            answer_text = student_answer
+            # Clean up JSON answers for display
+            if task_type in ("multichoice", "matching", "ordering", "cloze"):
+                answer_text = student_answer[:300]
+            elif len(answer_text) > 500:
+                answer_text = answer_text[:500] + "..."
+            # Strip data URIs
+            if answer_text.startswith("data:"):
+                answer_text = "[Bild/Zeichnung]"
+            task_elements.append(Paragraph(
+                f"<b>Antwort:</b> {_escape(answer_text)}", styles["Normal2"]
+            ))
+        elif task_type in ("drawing", "photo"):
+            task_elements.append(Paragraph("<b>Antwort:</b> [Bild/Zeichnung]", styles["Normal2"]))
+        elif task_type == "description":
+            task_elements.append(Paragraph("<i>Keine Antwort erforderlich</i>", styles["Small"]))
+        else:
+            task_elements.append(Paragraph("<b>Antwort:</b> <i>Keine Antwort</i>", styles["Normal2"]))
+
+        # Feedback
         if feedback:
-            elements.append(Spacer(1, 1 * mm))
-            elements.append(Paragraph(f"Feedback: {feedback}", styles["Small"]))
-        elements.append(Spacer(1, 5 * mm))
+            task_elements.append(Spacer(1, 1 * mm))
+            task_elements.append(Paragraph(f"<b>Bewertung:</b> {_escape(feedback)}", styles["Feedback"]))
+
+        # Solution (if enabled)
+        show_solution = (
+            (solution_mode == "all") or
+            (solution_mode == "correct" and not is_correct)
+        )
+        if show_solution and solution:
+            task_elements.append(Spacer(1, 1 * mm))
+            sol_text = solution[:500] + "..." if len(solution) > 500 else solution
+            task_elements.append(Paragraph(
+                f"<b>Musterloesung:</b> {_escape(sol_text)}", styles["Solution"]
+            ))
+
+        task_elements.append(Spacer(1, 2 * mm))
+        task_elements.append(HRFlowable(width="100%", thickness=0.3, color=colors.HexColor("#e2e8f0")))
+        task_elements.append(Spacer(1, 3 * mm))
+
+        # Keep task together on one page if possible
+        elements.append(KeepTogether(task_elements))
+
+    # === SIGNATURE SECTION ===
+    elements.append(Spacer(1, 12 * mm))
+    sig_data = [
+        [
+            Paragraph("_" * 40, styles["Normal2"]),
+            "",
+            Paragraph("_" * 40, styles["Normal2"]),
+        ],
+        [
+            Paragraph("Datum, Unterschrift Lehrer/in", styles["Small"]),
+            "",
+            Paragraph("Unterschrift Schueler/in", styles["Small"]),
+        ],
+    ]
+    sig_table = Table(sig_data, colWidths=[200, 60, 200])
+    sig_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    elements.append(sig_table)
+
+    # Footer note
+    elements.append(Spacer(1, 8 * mm))
+    elements.append(Paragraph(
+        f"Erstellt mit ExamPilot am {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        styles["RightAlign"]
+    ))
 
     doc.build(elements)
     buffer.seek(0)
@@ -97,6 +228,8 @@ def generate_overview_pdf(exam_title, class_name, results, grading_scale=None):
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle("Title2", parent=styles["Title"], fontName=font_bold, fontSize=16))
     styles.add(ParagraphStyle("Normal2", parent=styles["Normal"], fontName=font, fontSize=10))
+    styles.add(ParagraphStyle("RightAlign", fontName=font, fontSize=8.5, alignment=TA_RIGHT,
+                               textColor=colors.HexColor("#94a3b8")))
 
     elements = []
 
@@ -134,6 +267,13 @@ def generate_overview_pdf(exam_title, class_name, results, grading_scale=None):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     elements.append(table)
+
+    # Footer
+    elements.append(Spacer(1, 10 * mm))
+    elements.append(Paragraph(
+        f"Erstellt mit ExamPilot am {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        styles["RightAlign"]
+    ))
 
     doc.build(elements)
     buffer.seek(0)
