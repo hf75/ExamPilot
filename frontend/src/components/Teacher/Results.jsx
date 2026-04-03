@@ -198,6 +198,20 @@ export default function Results() {
                 >
                   {s.dispute_count > 0 ? "Pruefen" : "Details"}
                 </button>
+                <button
+                  className="btn-small btn-danger"
+                  onClick={async () => {
+                    if (!confirm(`Sitzung von ${s.student_name} wirklich löschen? Alle Antworten gehen verloren.`)) return;
+                    try {
+                      await api.delete(`/api/exams/${examId}/sessions/${s.session_id}`);
+                      toast.success("Sitzung gelöscht");
+                      loadResults();
+                    } catch (err) { toast.error(err.message); }
+                  }}
+                  title="Sitzung löschen"
+                >
+                  &times;
+                </button>
               </td>
             </tr>
           ))}

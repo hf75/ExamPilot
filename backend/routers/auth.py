@@ -139,6 +139,35 @@ async def login(req: LoginRequest, request: Request, db: aiosqlite.Connection = 
     return TokenResponse(token=token)
 
 
+@router.put("/password")
+async def change_password(
+    body: dict,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Change the teacher password. Requires old_password and new_password."""
+    old_pw = body.get("old_password", "")
+    new_pw = body.get("new_password", "")
+    if not old_pw or not new_pw:
+        raise HTTPException(status_code=400, detail="Altes und neues Passwort erforderlich")
+    if len(new_pw) < 4:
+        raise HTTPException(status_code=400, detail="Neues Passwort muss mindestens 4 Zeichen haben")
+
+    cursor = await db.execute(
+        "SELECT value FROM settings WHERE key = ?", (TEACHER_PASSWORD_HASH_KEY,)
+    )
+    row = await cursor.fetchone()
+    if not row or not verify_password(old_pw, row[0]):
+        raise HTTPException(status_code=401, detail="Altes Passwort ist falsch")
+
+    hashed = hash_password(new_pw)
+    await db.execute(
+        "UPDATE settings SET value = ? WHERE key = ?", (hashed, TEACHER_PASSWORD_HASH_KEY)
+    )
+    await db.commit()
+    return {"message": "Passwort geändert"}
+
+
 @router.post("/logout")
 async def logout(
     credentials: HTTPAuthorizationCredentials = Depends(security),

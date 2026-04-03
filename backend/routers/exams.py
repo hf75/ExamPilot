@@ -228,6 +228,27 @@ async def remove_task_from_exam(
     return {"message": "Aufgabe entfernt"}
 
 
+@router.put("/{exam_id}/tasks/reorder")
+async def reorder_exam_tasks(
+    exam_id: int,
+    body: dict,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Reorder tasks in an exam. Body: {"task_ids": [3, 1, 2]}"""
+    task_ids = body.get("task_ids", [])
+    if not task_ids:
+        raise HTTPException(status_code=400, detail="task_ids erforderlich")
+
+    for pos, tid in enumerate(task_ids, 1):
+        await db.execute(
+            "UPDATE exam_tasks SET position = ? WHERE exam_id = ? AND task_id = ?",
+            (pos, exam_id, tid),
+        )
+    await db.commit()
+    return {"message": "Reihenfolge aktualisiert"}
+
+
 @router.get("/{exam_id}/preview")
 async def preview_exam(
     exam_id: int,

@@ -207,6 +207,10 @@ async def init_db():
         if not await has_column("students", "lti_user_id"):
             await db.execute("ALTER TABLE students ADD COLUMN lti_user_id TEXT")
 
+        # Migration: session tokens persisted in DB (survive server restart)
+        if not await has_column("exam_sessions", "session_token"):
+            await db.execute("ALTER TABLE exam_sessions ADD COLUMN session_token TEXT")
+
         # Indexes on foreign keys for query performance
         await db.execute("CREATE INDEX IF NOT EXISTS idx_exam_sessions_exam_id ON exam_sessions(exam_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_exam_sessions_student_id ON exam_sessions(student_id)")

@@ -24,48 +24,40 @@ router = APIRouter(prefix="/api/student", tags=["student"])
 # In-memory tracking for live dashboard: {session_id: {"task_id": int, "last_seen": str}}
 _student_activity: dict[int, dict] = {}
 
-# Session tokens: {session_id: (token, created_at)} — validates student owns the session
-_session_tokens: dict[int, tuple[str, float]] = {}
-
-SESSION_TOKEN_MAX_AGE = 24 * 3600  # 24 hours
-_MAX_SESSIONS = 10000
+# Token cache to avoid DB lookups on every request: {session_id: token}
+_token_cache: dict[int, str] = {}
 _MAX_ACTIVITY = 5000
 
 
-def _cleanup_expired_tokens():
-    """Remove expired session tokens and cap size."""
-    now = time.time()
-    expired = [sid for sid, (_, created) in _session_tokens.items()
-               if now - created > SESSION_TOKEN_MAX_AGE]
-    for sid in expired:
-        _session_tokens.pop(sid, None)
-        _student_activity.pop(sid, None)
-    # Hard cap: remove oldest if too many
-    if len(_session_tokens) > _MAX_SESSIONS:
-        sorted_by_age = sorted(_session_tokens.items(), key=lambda x: x[1][1])
-        for sid, _ in sorted_by_age[:len(_session_tokens) - _MAX_SESSIONS]:
-            _session_tokens.pop(sid, None)
-            _student_activity.pop(sid, None)
-    # Cap activity dict too
-    if len(_student_activity) > _MAX_ACTIVITY:
-        oldest = sorted(_student_activity.items(), key=lambda x: x[1].get("last_seen", ""))
-        for sid, _ in oldest[:len(_student_activity) - _MAX_ACTIVITY]:
-            _student_activity.pop(sid, None)
-
-
 def _check_session_token(session_id: int, token: Optional[str]):
-    """Verify the caller owns this specific session_id."""
+    """Verify the caller owns this specific session_id via cached or DB token."""
     if not token:
         raise HTTPException(status_code=401, detail="Session-Token fehlt")
-    entry = _session_tokens.get(session_id)
-    if not entry:
-        raise HTTPException(status_code=403, detail="Zugriff verweigert")
-    expected_token, created_at = entry
-    if expected_token != token:
-        raise HTTPException(status_code=403, detail="Zugriff verweigert")
-    if time.time() - created_at > SESSION_TOKEN_MAX_AGE:
-        _session_tokens.pop(session_id, None)
-        raise HTTPException(status_code=401, detail="Session abgelaufen")
+    # Check cache first
+    cached = _token_cache.get(session_id)
+    if cached and cached == token:
+        return
+    # Fallback: check DB (handles server restart)
+    import sqlite3
+    from config import DB_PATH
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        cursor = conn.execute(
+            "SELECT session_token FROM exam_sessions WHERE id = ?", (session_id,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0] and row[0] == token:
+            _token_cache[session_id] = token  # Warm the cache
+            # Cap cache size
+            if len(_token_cache) > 10000:
+                oldest = list(_token_cache.keys())[:5000]
+                for k in oldest:
+                    _token_cache.pop(k, None)
+            return
+    except Exception:
+        pass
+    raise HTTPException(status_code=403, detail="Zugriff verweigert")
 
 
 @router.get("/exams")
@@ -120,23 +112,26 @@ async def join_exam(
     )
     existing = await cursor.fetchone()
     if existing:
+        sid = existing[0]
+        # Reuse existing token or generate new one
+        cursor = await db.execute("SELECT session_token FROM exam_sessions WHERE id = ?", (sid,))
+        tok_row = await cursor.fetchone()
+        token = tok_row[0] if tok_row and tok_row[0] else secrets.token_urlsafe(32)
+        if not (tok_row and tok_row[0]):
+            await db.execute("UPDATE exam_sessions SET session_token = ? WHERE id = ?", (token, sid))
         await db.commit()
-        _cleanup_expired_tokens()
-        entry = _session_tokens.get(existing[0])
-        token = entry[0] if entry else secrets.token_urlsafe(32)
-        _session_tokens[existing[0]] = (token, time.time())
-        return {"session_id": existing[0], "session_token": token, "message": "Bestehende Sitzung fortgesetzt"}
+        _token_cache[sid] = token
+        return {"session_id": sid, "session_token": token, "message": "Bestehende Sitzung fortgesetzt"}
 
     # Create new session
+    token = secrets.token_urlsafe(32)
     cursor = await db.execute(
-        "INSERT INTO exam_sessions (exam_id, student_id) VALUES (?, ?)",
-        (req.exam_id, student_id),
+        "INSERT INTO exam_sessions (exam_id, student_id, session_token) VALUES (?, ?, ?)",
+        (req.exam_id, student_id, token),
     )
     session_id = cursor.lastrowid
     await db.commit()
-    _cleanup_expired_tokens()
-    token = secrets.token_urlsafe(32)
-    _session_tokens[session_id] = (token, time.time())
+    _token_cache[session_id] = token
     await broadcast(req.exam_id, "student_joined", {"student_name": req.name, "session_id": session_id})
     return {"session_id": session_id, "session_token": token, "message": "Erfolgreich angemeldet"}
 
@@ -951,6 +946,11 @@ async def heartbeat(req: HeartbeatRequest, db: aiosqlite.Connection = Depends(ge
         "task_id": req.current_task_id,
         "last_seen": datetime.utcnow().isoformat(),
     }
+    # Cap activity dict
+    if len(_student_activity) > _MAX_ACTIVITY:
+        oldest = sorted(_student_activity.items(), key=lambda x: x[1].get("last_seen", ""))
+        for sid, _ in oldest[:len(_student_activity) - _MAX_ACTIVITY]:
+            _student_activity.pop(sid, None)
     return {"ok": True}
 
 

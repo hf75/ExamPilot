@@ -872,6 +872,22 @@ function ExamDetail({ exam, onBack }) {
     }
   }
 
+  async function moveTask(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= examTasks.length) return;
+    const reordered = [...examTasks];
+    [reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+    setExamTasks(reordered);
+    try {
+      await api.put(`/api/exams/${exam.id}/tasks/reorder`, {
+        task_ids: reordered.map(t => t.id),
+      });
+    } catch (err) {
+      toast.error(err.message);
+      loadExamTasks();
+    }
+  }
+
   const examTaskIds = new Set(examTasks.map((t) => t.id));
   const availableTasks = poolTasks.filter(
     (t) =>
@@ -957,7 +973,21 @@ function ExamDetail({ exam, onBack }) {
             <div className="exam-task-list">
               {examTasks.map((task, index) => (
                 <div key={task.id} className="exam-task-item-wrap">
-                  <span className="exam-task-pos">{index + 1}.</span>
+                  <div className="exam-task-reorder">
+                    <button
+                      className="btn-reorder"
+                      onClick={() => moveTask(index, -1)}
+                      disabled={index === 0}
+                      title="Nach oben"
+                    >&uarr;</button>
+                    <span className="exam-task-pos">{index + 1}.</span>
+                    <button
+                      className="btn-reorder"
+                      onClick={() => moveTask(index, 1)}
+                      disabled={index === examTasks.length - 1}
+                      title="Nach unten"
+                    >&darr;</button>
+                  </div>
                   <TaskPreview
                     task={task}
                     expanded={expandedExamTask === task.id}

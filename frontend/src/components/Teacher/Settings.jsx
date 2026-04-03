@@ -128,6 +128,13 @@ export default function Settings() {
     }
   }
 
+  // Password change state
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+
   // Tunnel state
   const [tunnelEnabled, setTunnelEnabled] = useState(false);
   const [tunnelUrl, setTunnelUrl] = useState(null);
@@ -241,6 +248,45 @@ export default function Settings() {
             <button className="btn-secondary" onClick={() => { setShowKeyInput(false); setNewApiKey(""); }} style={{ fontSize: "0.85rem" }}>
               Abbrechen
             </button>
+          </div>
+        )}
+      </div>
+
+      <div className="settings-section">
+        <h3>Passwort aendern</h3>
+        {!showPasswordChange ? (
+          <button className="btn-primary-sm" onClick={() => setShowPasswordChange(true)}>
+            Passwort aendern
+          </button>
+        ) : (
+          <div>
+            <div className="form-group">
+              <label>Altes Passwort</label>
+              <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} autoFocus />
+            </div>
+            <div className="form-group">
+              <label>Neues Passwort</label>
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>Neues Passwort bestaetigen</label>
+              <input type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button className="btn-primary-sm" disabled={savingPassword} onClick={async () => {
+                if (newPassword !== confirmNewPassword) { toast.error("Passwörter stimmen nicht überein"); return; }
+                if (newPassword.length < 4) { toast.error("Mindestens 4 Zeichen"); return; }
+                setSavingPassword(true);
+                try {
+                  await api.put("/api/auth/password", { old_password: oldPassword, new_password: newPassword });
+                  toast.success("Passwort geändert");
+                  setShowPasswordChange(false);
+                  setOldPassword(""); setNewPassword(""); setConfirmNewPassword("");
+                } catch (err) { toast.error(err.message); }
+                finally { setSavingPassword(false); }
+              }}>{savingPassword ? "..." : "Speichern"}</button>
+              <button className="btn-secondary" onClick={() => { setShowPasswordChange(false); setOldPassword(""); setNewPassword(""); setConfirmNewPassword(""); }}>Abbrechen</button>
+            </div>
           </div>
         )}
       </div>

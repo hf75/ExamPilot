@@ -475,6 +475,27 @@ async def get_exam_statistics(
     return {"class_stats": class_stats, "task_stats": task_stats}
 
 
+@router.delete("/{exam_id}/sessions/{session_id}")
+async def delete_student_session(
+    exam_id: int,
+    session_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+    _: bool = Depends(require_teacher),
+):
+    """Delete a single student session and all its answers."""
+    cursor = await db.execute(
+        "SELECT id FROM exam_sessions WHERE id = ? AND exam_id = ?", (session_id, exam_id)
+    )
+    if not await cursor.fetchone():
+        raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
+    await db.execute("DELETE FROM answers WHERE session_id = ?", (session_id,))
+    await db.execute("DELETE FROM exam_sessions WHERE id = ?", (session_id,))
+    # Invalidate class analysis cache
+    await db.execute("DELETE FROM class_analyses WHERE exam_id = ?", (exam_id,))
+    await db.commit()
+    return {"message": "Sitzung gelöscht"}
+
+
 @router.delete("/{exam_id}/class-analysis")
 async def delete_class_analysis(
     exam_id: int,
