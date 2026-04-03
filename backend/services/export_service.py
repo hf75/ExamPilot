@@ -1,9 +1,12 @@
+import base64
 import io
+import re
 from datetime import datetime
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
@@ -12,6 +15,7 @@ from reportlab.platypus import (
     TableStyle,
     HRFlowable,
     KeepTogether,
+    Image,
 )
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
@@ -35,6 +39,47 @@ def _escape(text: str) -> str:
     if not text:
         return ""
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+_IMG_PATTERN = re.compile(r'!\[img_\d+\]\((data:image/[^)]+)\)')
+_MAX_IMG_WIDTH = 160 * mm  # max width in PDF
+
+
+def _render_text_with_images(text: str, style) -> list:
+    """Split text on embedded base64 images, return list of Paragraph and Image flowables."""
+    parts = _IMG_PATTERN.split(text)
+    elements = []
+    for i, part in enumerate(parts):
+        if i % 2 == 0:
+            # Text part
+            cleaned = part.strip()
+            if cleaned:
+                elements.append(Paragraph(_escape(cleaned), style))
+        else:
+            # data:image/... URI
+            try:
+                header, b64_data = part.split(",", 1)
+                img_bytes = base64.b64decode(b64_data)
+                img_buf = io.BytesIO(img_bytes)
+                img = ImageReader(img_buf)
+                iw, ih = img.getSize()
+                # Scale down to fit page width, keep aspect ratio
+                if iw > _MAX_IMG_WIDTH:
+                    scale = _MAX_IMG_WIDTH / iw
+                    iw = _MAX_IMG_WIDTH
+                    ih = ih * scale
+                # Cap height too
+                max_h = 120 * mm
+                if ih > max_h:
+                    scale = max_h / ih
+                    ih = max_h
+                    iw = iw * scale
+                elements.append(Spacer(1, 2 * mm))
+                elements.append(Image(img_buf, width=iw, height=ih))
+                elements.append(Spacer(1, 2 * mm))
+            except Exception:
+                elements.append(Paragraph("[Bild konnte nicht geladen werden]", style))
+    return elements
 
 
 def generate_student_pdf(student_name, exam_title, answers, total_points, max_points,
@@ -131,32 +176,42 @@ def generate_student_pdf(student_name, exam_title, answers, total_points, max_po
         ))
         task_elements.append(Spacer(1, 1.5 * mm))
 
-        # Task text (truncated for very long texts)
+        # Task text with embedded images
         if task_text and task_type != "description":
-            # Strip base64 images from text for PDF (they'd be huge)
-            import re
-            clean_text = re.sub(r'!\[img_\d+\]\(data:[^)]+\)', '[Bild]', task_text)
-            if len(clean_text) > 600:
-                clean_text = clean_text[:600] + "..."
-            task_elements.append(Paragraph(_escape(clean_text), styles["Small"]))
+            text_elements = _render_text_with_images(task_text, styles["Small"])
+            task_elements.extend(text_elements)
             task_elements.append(Spacer(1, 1.5 * mm))
 
         # Student answer
-        if student_answer and task_type not in ("description", "drawing", "photo"):
-            answer_text = student_answer
-            # Clean up JSON answers for display
-            if task_type in ("multichoice", "matching", "ordering", "cloze"):
-                answer_text = student_answer[:300]
-            elif len(answer_text) > 500:
-                answer_text = answer_text[:500] + "..."
-            # Strip data URIs
-            if answer_text.startswith("data:"):
-                answer_text = "[Bild/Zeichnung]"
-            task_elements.append(Paragraph(
-                f"<b>Antwort:</b> {_escape(answer_text)}", styles["Normal2"]
-            ))
-        elif task_type in ("drawing", "photo"):
-            task_elements.append(Paragraph("<b>Antwort:</b> [Bild/Zeichnung]", styles["Normal2"]))
+        if student_answer and task_type not in ("description",):
+            if student_answer.startswith("data:image"):
+                # Drawing/photo answer: render as image
+                task_elements.append(Paragraph("<b>Antwort:</b>", styles["Normal2"]))
+                try:
+                    header, b64_data = student_answer.split(",", 1)
+                    img_bytes = base64.b64decode(b64_data)
+                    img_buf = io.BytesIO(img_bytes)
+                    img = ImageReader(img_buf)
+                    iw, ih = img.getSize()
+                    if iw > _MAX_IMG_WIDTH:
+                        scale = _MAX_IMG_WIDTH / iw
+                        iw, ih = _MAX_IMG_WIDTH, ih * scale
+                    max_h = 100 * mm
+                    if ih > max_h:
+                        scale = max_h / ih
+                        iw, ih = iw * scale, max_h
+                    task_elements.append(Image(img_buf, width=iw, height=ih))
+                except Exception:
+                    task_elements.append(Paragraph("[Bild konnte nicht geladen werden]", styles["Small"]))
+            else:
+                answer_text = student_answer
+                if task_type in ("multichoice", "matching", "ordering", "cloze"):
+                    answer_text = student_answer[:300]
+                elif len(answer_text) > 500:
+                    answer_text = answer_text[:500] + "..."
+                task_elements.append(Paragraph(
+                    f"<b>Antwort:</b> {_escape(answer_text)}", styles["Normal2"]
+                ))
         elif task_type == "description":
             task_elements.append(Paragraph("<i>Keine Antwort erforderlich</i>", styles["Small"]))
         else:
