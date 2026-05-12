@@ -1,10 +1,22 @@
 @echo off
+setlocal
 echo ============================================
 echo   ExamPilot - Portable Build erstellen
 echo ============================================
 echo.
 
 cd /d "%~dp0"
+set "ROOT=%~dp0"
+set "VENV=%LOCALAPPDATA%\ExamPilot\build-venv"
+set "PYTHON_EXE=%VENV%\Scripts\python.exe"
+set "ACTIVATE_BAT=%VENV%\Scripts\activate.bat"
+set "PYI_WORK=%TEMP%\ExamPilot-pyinstaller-%RANDOM%-%RANDOM%"
+set "DISTPATH=%ROOT%dist"
+echo %ROOT% | findstr /I "OneDrive" >nul 2>&1
+if not errorlevel 1 (
+    echo Hinweis: OneDrive-Pfad erkannt. Build-Ausgabe wird lokal abgelegt.
+    set "DISTPATH=%LOCALAPPDATA%\ExamPilot\portable-dist-%RANDOM%-%RANDOM%"
+)
 
 REM === Check prerequisites ===
 python --version >nul 2>&1
@@ -14,29 +26,58 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM === Setup venv if needed ===
-if not exist "backend\venv" (
-    echo Erstelle virtuelle Umgebung...
-    cd backend
-    python -m venv venv
-    call venv\Scripts\activate.bat
-    pip install -r requirements.txt
-    cd ..
-) else (
-    call backend\venv\Scripts\activate.bat
+REM === Setup or repair venv ===
+set "RECREATE_VENV=0"
+if not exist "%PYTHON_EXE%" set "RECREATE_VENV=1"
+if exist "%ACTIVATE_BAT%" (
+    findstr /C:"VIRTUAL_ENV=%VENV%" "%ACTIVATE_BAT%" >nul 2>&1
+    if errorlevel 1 set "RECREATE_VENV=1"
 )
 
-REM === Install PyInstaller ===
+if "%RECREATE_VENV%"=="1" (
+    echo Erstelle virtuelle Umgebung...
+    python -m venv --clear "%VENV%"
+    if errorlevel 1 (
+        echo FEHLER: Virtuelle Umgebung konnte nicht erstellt werden!
+        pause
+        exit /b 1
+    )
+)
+
+REM === Install backend dependencies and PyInstaller ===
+echo Installiere Python-Abhaengigkeiten...
+"%PYTHON_EXE%" -m pip install -r "backend\requirements.txt" >nul 2>&1
+if errorlevel 1 (
+    echo FEHLER: Python-Abhaengigkeiten konnten nicht installiert werden!
+    pause
+    exit /b 1
+)
+
 echo Installiere PyInstaller...
-pip install pyinstaller >nul 2>&1
+"%PYTHON_EXE%" -m pip install pyinstaller >nul 2>&1
+if errorlevel 1 (
+    echo FEHLER: PyInstaller konnte nicht installiert werden!
+    pause
+    exit /b 1
+)
 
 REM === Build frontend ===
 echo Baue Frontend...
 cd frontend
-if not exist "node_modules" (
-    call npm install
+call npm install
+if errorlevel 1 (
+    echo FEHLER: npm install fehlgeschlagen!
+    cd ..
+    pause
+    exit /b 1
 )
 call npm run build
+if errorlevel 1 (
+    echo FEHLER: Frontend Build fehlgeschlagen!
+    cd ..
+    pause
+    exit /b 1
+)
 cd ..
 
 REM === Check frontend dist exists ===
@@ -51,7 +92,7 @@ echo.
 echo Erstelle portable EXE mit PyInstaller...
 echo (Das kann ein paar Minuten dauern)
 echo.
-pyinstaller --clean --noconfirm ExamPilot.spec
+"%PYTHON_EXE%" -m PyInstaller --clean --noconfirm --workpath "%PYI_WORK%" --distpath "%DISTPATH%" ExamPilot.spec
 
 if errorlevel 1 (
     echo.
@@ -65,7 +106,7 @@ echo ============================================
 echo   Build erfolgreich!
 echo.
 echo   Der portable Ordner ist:
-echo   dist\ExamPilot\
+echo   %DISTPATH%\ExamPilot\
 echo.
 echo   Diesen Ordner auf einen USB-Stick kopieren
 echo   oder als ZIP weitergeben.

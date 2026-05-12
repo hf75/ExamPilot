@@ -38,13 +38,12 @@ function getBlockly() {
   return blocklyPromise;
 }
 
-export default function Coding({ task, questionData, answer, onChange, disabled }) {
+export default function Coding({ questionData, answer, onChange, disabled }) {
   const lang = questionData.language || "javascript";
   const [code, setCode] = useState(questionData.starter_code || "");
   const [output, setOutput] = useState("");
   const [testResults, setTestResults] = useState([]);
   const [running, setRunning] = useState(false);
-  const [runtimeReady, setRuntimeReady] = useState(lang === "javascript" || lang === "html");
   const [blocklyReady, setBlocklyReady] = useState(false);
   const [blocksXml, setBlocksXml] = useState("");
   const iframeRef = useRef(null);
@@ -65,13 +64,6 @@ export default function Coding({ task, questionData, answer, onChange, disabled 
       }
     }
   }, []);
-
-  // For Python/SQL/TS: check if runtime loads (they always load in-iframe)
-  useEffect(() => {
-    if (lang !== "javascript" && lang !== "html" && lang !== "blockly") {
-      setRuntimeReady(true); // Runtime loads inside iframe on demand
-    }
-  }, [lang]);
 
   // Initialize Blockly workspace
   useEffect(() => {
@@ -243,10 +235,9 @@ export default function Coding({ task, questionData, answer, onChange, disabled 
 
   function runInSandbox(language) {
     const testCases = questionData.test_cases || [];
-    const hiddenTests = questionData.hidden_tests || false;
 
     if (language === "python") {
-      const testCode = testCases.map((tc, i) => `
+      const testCode = testCases.map((tc) => `
 try:
     __result = str(${tc.input})
     __expected = ${JSON.stringify(tc.expected_output)}
@@ -290,7 +281,7 @@ function transpileTS(code) {
 }
 </script>` : "";
 
-      const testRunnerCode = testCases.map((tc, i) => `
+      const testRunnerCode = testCases.map((tc) => `
 try {
   var __r = String(${tc.input});
   __results.push({passed: __r.trim() === ${JSON.stringify(tc.expected_output)}.trim(), actual_output: __r});

@@ -809,7 +809,6 @@ function ExamDetail({ exam, onBack }) {
   const [selectedPoolId, setSelectedPoolId] = useState(null);
   const [poolTasks, setPoolTasks] = useState([]);
   const [search, setSearch] = useState("");
-  const [showPool, setShowPool] = useState(false);
   const [expandedExamTask, setExpandedExamTask] = useState(null);
   const [expandedPoolTask, setExpandedPoolTask] = useState(null);
 

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, setToken } from "../../api/client";
 
+const MIN_TEACHER_PASSWORD_LENGTH = 8;
+
 export default function Login() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -26,6 +28,11 @@ export default function Login() {
 
     if (isSetup && password !== confirmPassword) {
       setError("Passwörter stimmen nicht überein");
+      return;
+    }
+
+    if (isSetup && password.length < MIN_TEACHER_PASSWORD_LENGTH) {
+      setError(`Passwort muss mindestens ${MIN_TEACHER_PASSWORD_LENGTH} Zeichen haben`);
       return;
     }
 
@@ -60,6 +67,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Passwort eingeben"
+              minLength={isSetup ? MIN_TEACHER_PASSWORD_LENGTH : undefined}
               required
               autoFocus
             />
@@ -74,6 +82,7 @@ export default function Login() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Passwort wiederholen"
+                minLength={MIN_TEACHER_PASSWORD_LENGTH}
                 required
               />
             </div>

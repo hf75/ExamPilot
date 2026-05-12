@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import InlineMarkdown from "./InlineMarkdown";
 
 export default function Ordering({ task, questionData, answer, onChange, disabled }) {

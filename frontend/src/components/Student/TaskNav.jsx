@@ -1,4 +1,4 @@
-export default function TaskNav({ tasks, currentIndex, answers, isRealAnswer, flagged, onSelect, onToggleFlag }) {
+export default function TaskNav({ tasks, currentIndex, answers, isRealAnswer, flagged, onSelect }) {
   return (
     <div className="task-nav-sidebar">
       <h4>Aufgaben</h4>

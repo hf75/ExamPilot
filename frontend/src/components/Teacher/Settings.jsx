@@ -21,6 +21,8 @@ const ALL_TASK_TYPES = {
   photo: "Foto-Aufgabe",
 };
 
+const MIN_TEACHER_PASSWORD_LENGTH = 8;
+
 export default function Settings() {
   const [enabledTypes, setEnabledTypes] = useState(Object.keys(ALL_TASK_TYPES));
   const [loading, setLoading] = useState(true);
@@ -275,7 +277,7 @@ export default function Settings() {
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <button className="btn-primary-sm" disabled={savingPassword} onClick={async () => {
                 if (newPassword !== confirmNewPassword) { toast.error("Passwörter stimmen nicht überein"); return; }
-                if (newPassword.length < 4) { toast.error("Mindestens 4 Zeichen"); return; }
+                if (newPassword.length < MIN_TEACHER_PASSWORD_LENGTH) { toast.error(`Mindestens ${MIN_TEACHER_PASSWORD_LENGTH} Zeichen`); return; }
                 setSavingPassword(true);
                 try {
                   await api.put("/api/auth/password", { old_password: oldPassword, new_password: newPassword });

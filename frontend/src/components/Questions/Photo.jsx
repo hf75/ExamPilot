@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { toast } from "../shared/Toast";
 
-export default function Photo({ task, questionData, answer, onChange, disabled }) {
+export default function Photo({ answer, onChange, disabled }) {
   const [preview, setPreview] = useState(answer && answer.startsWith("data:image") ? answer : null);
   const [capturing, setCapturing] = useState(false);
   const videoRef = useRef(null);

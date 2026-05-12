@@ -2,23 +2,32 @@ import { useState, useEffect, useRef, useId, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-// Lazy-load mermaid from CDN
+const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+const RELATIVE_URL_PATTERN = /^(#|\/(?!\/)|\.{1,2}\/|[^:/?#]+(?:[/?#]|$))/;
+const SAFE_IMAGE_DATA_URL_PATTERN = /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[a-z0-9+/=\s]+$/i;
+
+function safeMarkdownUrl(url, key) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (RELATIVE_URL_PATTERN.test(value)) return value;
+  if (key === "src" && SAFE_IMAGE_DATA_URL_PATTERN.test(value)) return value;
+
+  try {
+    const parsed = new URL(value);
+    if (SAFE_PROTOCOLS.has(parsed.protocol)) return value;
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
 let mermaidPromise = null;
 function getMermaid() {
   if (!mermaidPromise) {
-    mermaidPromise = new Promise((resolve, reject) => {
-      if (window.mermaid) {
-        resolve(window.mermaid);
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
-      script.onload = () => {
-        window.mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });
-        resolve(window.mermaid);
-      };
-      script.onerror = reject;
-      document.head.appendChild(script);
+    mermaidPromise = import("mermaid").then(({ default: mermaid }) => {
+      mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });
+      return mermaid;
     });
   }
   return mermaidPromise;
@@ -134,7 +143,7 @@ export default function Markdown({ children }) {
     <div className="md-content">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        urlTransform={(url) => url}
+        urlTransform={safeMarkdownUrl}
         components={{
           code({ className, children: codeChildren, ...props }) {
             const match = /language-mermaid/.test(className || "");

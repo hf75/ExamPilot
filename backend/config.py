@@ -37,8 +37,8 @@ def _resolve_env(name: str, fallback: str = "") -> str:
 
 
 ANTHROPIC_API_KEY = _resolve_env("ANTHROPIC_API_KEY")
-CLAUDE_MODEL = "claude-sonnet-4-6"
-CLAUDE_MAX_TOKENS = 1000
+CLAUDE_MODEL = "claude-opus-4-7"
+CLAUDE_MAX_TOKENS = 16000
 
 TEACHER_PASSWORD_HASH_KEY = "teacher_password_hash"
 API_KEY_SETTINGS_KEY = "anthropic_api_key"

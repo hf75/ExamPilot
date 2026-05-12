@@ -193,7 +193,7 @@ export default function ExamView() {
             session_id: parseInt(sessionId),
             task_id: parseInt(taskId),
             student_answer: answer,
-          }).catch((err) => { failures.push(taskId); })
+          }).catch(() => { failures.push(taskId); })
         );
       await Promise.all(savePromises);
 

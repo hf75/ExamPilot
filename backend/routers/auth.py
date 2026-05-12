@@ -24,6 +24,7 @@ _rate_limits: dict[str, list[float]] = defaultdict(list)
 MAX_ATTEMPTS = 10  # per window
 RATE_WINDOW = 300  # 5 minutes
 _MAX_RATE_IPS = 5000
+MIN_TEACHER_PASSWORD_LENGTH = 8
 
 
 def _check_rate_limit(request: Request):
@@ -103,6 +104,12 @@ async def auth_status(db: aiosqlite.Connection = Depends(get_db)):
 async def setup_password(
     req: SetupPasswordRequest, db: aiosqlite.Connection = Depends(get_db)
 ):
+    if len(req.password) < MIN_TEACHER_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Passwort muss mindestens {MIN_TEACHER_PASSWORD_LENGTH} Zeichen haben",
+        )
+
     cursor = await db.execute(
         "SELECT value FROM settings WHERE key = ?", (TEACHER_PASSWORD_HASH_KEY,)
     )
@@ -150,8 +157,11 @@ async def change_password(
     new_pw = body.get("new_password", "")
     if not old_pw or not new_pw:
         raise HTTPException(status_code=400, detail="Altes und neues Passwort erforderlich")
-    if len(new_pw) < 4:
-        raise HTTPException(status_code=400, detail="Neues Passwort muss mindestens 4 Zeichen haben")
+    if len(new_pw) < MIN_TEACHER_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Neues Passwort muss mindestens {MIN_TEACHER_PASSWORD_LENGTH} Zeichen haben",
+        )
 
     cursor = await db.execute(
         "SELECT value FROM settings WHERE key = ?", (TEACHER_PASSWORD_HASH_KEY,)

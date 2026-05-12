@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-export default function TrueFalse({ task, questionData, answer, onChange, disabled }) {
+export default function TrueFalse({ task, answer, onChange, disabled }) {
   const [selected, setSelected] = useState(answer || "");
   const isInternal = useRef(false);
 

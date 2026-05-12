@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-export default function Description({ task, questionData, answer, onChange, disabled }) {
+export default function Description({ answer, onChange }) {
   // Auto-mark as "answered" since no response needed
   useEffect(() => {
     if (!answer) onChange("_seen");

@@ -1,4 +1,4 @@
-export default function ShortAnswer({ task, questionData, answer, onChange, disabled }) {
+export default function ShortAnswer({ answer, onChange, disabled }) {
   return (
     <div className="question-shortanswer">
       <input

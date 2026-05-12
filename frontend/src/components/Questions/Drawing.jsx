@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 const MAX_HISTORY = 30;
 
-export default function Drawing({ task, questionData, answer, onChange, disabled }) {
+export default function Drawing({ questionData, answer, onChange, disabled }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);

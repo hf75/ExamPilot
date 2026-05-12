@@ -79,7 +79,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "frame-src 'self' blob:; "
             "font-src 'self'; "
             "object-src 'none'; "
-            "base-uri 'self'"
+            "base-uri 'self'; "
+            "form-action 'self'; "
+            "frame-ancestors 'none'"
         )
         return response
 

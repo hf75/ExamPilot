@@ -127,7 +127,7 @@ export default function DuelTeacherSetup() {
   async function handleDeleteDocQuestion(index) {
     if (!preparedRoom) return;
     try {
-      const result = await api.delete(`/api/duels/room/${preparedRoom.room_code}/question/${index}`);
+      await api.delete(`/api/duels/room/${preparedRoom.room_code}/question/${index}`);
       setDocQuestions((prev) => prev.filter((_, i) => i !== index));
     } catch (err) {
       toast.error(err.message);

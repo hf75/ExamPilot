@@ -1,4 +1,4 @@
-export default function Numerical({ task, questionData, answer, onChange, disabled }) {
+export default function Numerical({ answer, onChange, disabled }) {
   return (
     <div className="question-numerical">
       <input

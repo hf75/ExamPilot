@@ -1,4 +1,4 @@
-export default function Essay({ task, questionData, answer, onChange, disabled }) {
+export default function Essay({ questionData, answer, onChange, disabled }) {
   const lines = questionData.lines || 8;
 
   return (
